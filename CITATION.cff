@@ -1,0 +1,21 @@
+# 学术引用元数据（GitHub 会自动渲染"cite this repository"按钮）
+cff-version: 1.2.0
+message: >-
+  如本仓库的代码或方法对你的工作有帮助，请引用对应论文。
+title: >-
+  跨化学体系预训练与保形校准的锂离子电池寿命概率预测（代码与复现管线）
+authors:
+  - family-names: 杨
+    given-names: 王兴
+    email: 2024212097@bupt.cn
+    website: "https://github.com/Ywx-max"
+version: 1.0.0
+date-released: "2026-10-02"
+license: CC-BY-NC-SA-4.0
+repository-code: "https://github.com/Ywx-max/battery-transfer-conformal"
+keywords:
+  - lithium-ion battery
+  - remaining useful life
+  - transfer learning
+  - conformal prediction
+  - cross-chemistry

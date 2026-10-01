@@ -1,0 +1,8 @@
+# 解析与实验管线依赖（版本下限按实际使用到的 API 定）
+torch>=2.4        # t4d_per_cell_diag.py 用了 torch.load(weights_only=True)，2.4 起才支持
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+matplotlib>=3.8
+python-calamine>=0.1  # parse_calce_v2.py 的 xlsx 引擎（openpyxl 对 CALCE 原始文件又慢又易错）
+openpyxl>=3.1     # 备用 xlsx 引擎 / 读官方 MIT 特征表

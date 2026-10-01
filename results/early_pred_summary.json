@@ -1,0 +1,15 @@
+{
+ "rmse_log": 0.11703014421709372,
+ "rmse_cycles": 141.7271133957145,
+ "mae_cycles": 96.28144851137539,
+ "rel_err_pct": 19.4993441059948,
+ "n": 119,
+ "features": [
+  "dq_var",
+  "dq_mean",
+  "dq_slope",
+  "dq_intercept",
+  "dq_min",
+  "dq_max"
+ ]
+}

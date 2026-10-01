@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+data/*
+*.csv
+!results/**/*.csv
+!data/*.csv.gz
+!data/mit_dq_early.csv
+*.xlsx
+*.pt
+*.pth
+
+
+figures_reproduce/figures/
