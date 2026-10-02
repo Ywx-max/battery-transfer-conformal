@@ -22,8 +22,14 @@
 |---|---|
 | `data/建模表_v3.csv.gz` | 建模表 v3（13 列，105 287 行）；基线、迁移、保形实验的输入，`gunzip` 后即为下游脚本读取的 `data/建模表_v3.csv` |
 | `data/建模表_v3c.csv.gz` | 建模表 v3c = v3 + 7 列放电曲线特征（20 列）；消融实验的输入 |
+| `data/建模表_v5.csv.gz` | 建模表 v5（数据版本对照，`t3d_ablation_v5.py` 的输入） |
 | `data/mit_dq_early.csv` | MIT 早期预测的 ΔQ 特征表（124 行，含寿命标签）；4.7 节脚本的输入 |
 
 解压：`gunzip data/建模表_v3.csv.gz`（Windows 下用 7-Zip 或 `gzip -d` 同样可以）。
-这两张表由 `code/data_prep/` 的解析脚本产出的分数据集特征表合并而成，
-合并规则见 `code/data_prep/build_modeling_table.py`。
+这三张建模表由 `code/data_prep/` 的解析脚本产出的分数据集特征表合并而成，
+合并规则见 `code/data_prep/build_modeling_table.py`（注意：MIT 侧的分数据集中间产物
+未随仓库发布，从原始数据重建建模表需先补齐这些输入，见 code/README.md 的"复现边界"）。
+
+`data/mit_dq_early.csv` 为论文使用的**冻结版本**（作者本地管线提取）；
+`code/data_prep/extract_mit_dq_early.py` 是其特征定义的独立实现，与冻结版的
+关系（哪些统计量可对齐、哪些存在实现差异）见该脚本的 docstring。

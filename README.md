@@ -16,14 +16,15 @@ Code and analysis pipeline for the paper:
 
 | 论文中的结论 | 代码在哪儿 |
 |---|---|
-| 预训练价值随目标域数据减少而放大（NASA 1/14.5） | `code/transfer/t3_transfer_local.py` |
-| 源域校准区间全面崩塌、目标域再校准恢复（表 5） | `code/conformal/t4_conformal_local.py` |
+| 预训练价值随目标域数据减少而放大（NASA 1/15.0） | `code/transfer/t3_transfer_local.py` |
+| 源域校准区间全面崩塌、目标域再校准大幅修复覆盖但仍低于名义 0.90（表 5） | `code/conformal/t4_conformal_local.py` |
 | 逐电芯覆盖诊断 + 按电芯聚合保形变体（4.5 末） | `code/conformal/t4d_per_cell_diag.py` |
 | 漂移分解：量纲漂移 vs 关系漂移（表 4） | `code/transfer/t3b_std_local.py` |
 | 特征消融：曲线特征跨域有害（表 6） | `code/ablation/` |
 | 早期寿命预测：ΔQ 特征 + 岭回归（4.7） | `code/early_pred/t5_early_pred.py` |
 | 论文数字逐项自检（75 项；路径绑定作者本机布局，仓库内不可直接运行） | `code/checks/final_data_check.py` |
-| 结果一键复算（155 项，只读本仓库数据） | `code/checks/verify_results.py` |
+| 论文数字与仓库结果逐项对拍（179 项，只读本仓库数据） | `code/checks/verify_results.py` |
+| 从逐种子原始文件再生全部多种子汇总文件 | `code/checks/aggregate_results.py` |
 
 ## 仓库结构
 
@@ -44,14 +45,24 @@ figures_reproduce/   论文 4 张图的复现脚本（直接读 results/）
 脚本之间没有复杂的包依赖：单个文件拷出去，配上数据路径就能跑。
 完整的运行顺序和依赖说明在 `code/README.md`。
 
-## 结果一键复算
+## 结果核对与聚合
 
     python code/checks/verify_results.py
+    python code/checks/aggregate_results.py
 
-只读本仓库 `results/` 里的结果文件，把论文中的 155 个关键数字重算一遍
-（表 1-6、摘要增益比与变异系数、4.2 跨种子复核、4.5 逐电芯诊断、4.6 Welch 检验、
-4.7 早期预测），不需要原始数据集、不需要 GPU、也不需要论文源文件，纯标准库约 1 秒。
-逐行给出「论文位置 | 论文数值 | 由本仓库数据重算」，全部一致时返回码 0。（`final_data_check.py` 是同一核对的作者本地版，依赖作者机器的目录布局，仅供参照。）
+- `verify_results.py`：**一致性对拍**。只读本仓库 `results/` 里的结果文件，把论文中的
+  179 个关键数字与汇总文件逐项对拍（表 1-6、摘要增益比与变异系数、4.2 跨种子复核、
+  4.5 逐电芯诊断与条件化收窄、4.6 配对 t 检验、4.7 早期预测），不需要原始数据集、
+  不需要 GPU、也不需要论文源文件，纯标准库约 1 秒。逐行给出「论文位置 | 论文数值 |
+  由本仓库数据重算」，全部一致时返回码 0。它核对"论文数字有没有抄对"，不验证实验方法。
+- `aggregate_results.py`：**聚合层**。论文引用的全部多种子汇总 JSON/CSV 都能从
+  `results/` 下的逐种子原始文件再生（论文数字 → 汇总文件 → 逐种子文件，三层对齐），
+  约 1 秒、纯 numpy。（`final_data_check.py` 是同一核对的作者本地版，依赖作者机器的
+  目录布局，仅供参照。）
+- 完整的端到端复现（从原始数据重训全部实验）受三处限制，见 `code/README.md` 的
+  「复现边界」：MIT 侧建模表中间产物未随仓库发布、训练结果有 GPU 非确定性、
+  `data/mit_dq_early.csv` 为冻结版本（提取实现见 `code/data_prep/extract_mit_dq_early.py`
+  的说明）。
 
 ## 数据来源（均为公开数据集，本仓库不转存原始数据）
 
@@ -70,19 +81,23 @@ figures_reproduce/   论文 4 张图的复现脚本（直接读 results/）
 ## 运行环境
 
 - Python 3.11+，PyTorch 2.x（CUDA 可选，全部实验在单卡 8GB 笔记本 GPU 上也能跑），
-  pandas / numpy / scikit-learn / matplotlib。
+  pandas / numpy / scipy / scikit-learn / matplotlib。
 - `pip install -r requirements.txt`
 - 每个脚本顶部有一个 `DATA = ...` 路径常量，改成你的本地路径再跑；
   完整运行顺序见 `code/README.md`。
 
 ## AI 使用声明（AI Usage Statement）
 
-研究过程中使用生成式 AI 工具辅助完成了部分代码实现与文字表述润色；研究设计、全部实验、
-数据分析与结论均由作者本人独立完成，作者对全部内容负责。
+研究过程中使用生成式 AI 工具辅助完成了部分实验与数据处理代码的编写和调试，并辅助完成
+了全文的语言润色与文字改写（包括段落组织与表达方式的系统性调整）；研究设计、实验方案、
+全部数据的核对与验证以及科学结论均由作者本人独立完成，作者对全部内容负责。
 
-Generative AI tools were used to assist with part of the code implementation and language
-polishing. The research design, all experiments, data analysis and conclusions were completed
-independently by the author, who takes full responsibility for all content.
+Generative AI tools were used to assist with writing and debugging part of the experiment
+and data-processing code, and to assist with language polishing and rewriting of the
+manuscript (including systematic adjustment of paragraph organization and wording). The
+research design, experimental plan, verification of all data, and the scientific
+conclusions were completed independently by the author, who takes full responsibility
+for all content.
 
 ## 许可与版权声明（License & Copyright）
 

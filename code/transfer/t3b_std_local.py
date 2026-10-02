@@ -19,8 +19,8 @@ import torch
 import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
 
-# 7 维特征 = T2 的 8 维剔除 charge_dur_s：NASA 里这一列全缺失，
-# 逐数据集标准化下"整列常量/缺失"没法标准化，只能去掉。
+# 7 维特征 = T2 的 8 维剔除 charge_dur_s：这一列在 MIT 源域整列缺失
+# （CALCE/NASA 有），逐数据集标准化下"整列缺失"没法参与，只能去掉。
 FEATS = ["capacity_Ah", "soh", "discharge_dur_s", "v_mean_V", "v_min_V",
          "ica_peak", "ica_peak_V"]
 WINDOW = 20

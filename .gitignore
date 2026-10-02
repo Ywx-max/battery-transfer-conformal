@@ -11,3 +11,6 @@ data/*
 
 
 figures_reproduce/figures/
+
+# 本地 agent 工具目录（不随仓库发布）
+.claude/

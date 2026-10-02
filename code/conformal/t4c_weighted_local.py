@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """T4c-Weighted：协变量偏移下的加权保形（Tibshirani et al., 2019；论文 4.5 第二个扩展对照）。
 
-思路：如果目标域的 SOH 分布和源域不一样，校准样本就不该一视同仁。
-按"这块校准数据有多像目标域"加权，再加权算分位数。权重用两个 SOH
-分布的高斯密度比近似（均值方差都从块均值里估）。
+思路：如果目标域里校准块的误差规律和测试块不一样，校准样本就不该一视同仁。
+按"这块校准数据有多像测试块"加权，再加权算分位数。密度比 w(x)=p_test(x)/p_cal(x)
+在**目标域内部的校准块与测试块之间**估计（不是源域 vs 目标域），x 取块均值的
+模型预测 SOH——部署时测试块只有预测值、没有真值，权重只能用预测侧协变量
+（2026-10 修订：旧版误用测试真值 SOH 估密度比，构成标签泄漏，已改）。
 
-实测（多种子）：NASA 上两个分布几乎重合，密度比 ≈ 1，结果与单一分位数几乎
-一样；CALCE 上宽度收窄 15% 但覆盖率掉约 6 个百分点。和 Mondrian 一样是
-是小校准集上以覆盖换宽度的负结果。为什么收窄这么难，见论文 4.8 的讨论。
+实测（多种子）：NASA 上校准/测试块的预测 SOH 分布几乎重合，权重归一化后退化为
+均匀权重，结果与单一分位数几乎一样；CALCE 上宽度收窄但覆盖率也下降。和
+Mondrian 一样是小校准集上以覆盖换宽度的负结果。为什么收窄这么难，见论文 4.8 的讨论。
 
-运行：python t4c_weighted_local.py --seed 42
+运行：python t4c_weighted_local.py --seed 42（可选 --src-cache <dir> 复用源模型缓存）
 输出：results/conformal/t4c_weighted_s<seed>.json"""
-import json, os, random, time
+import argparse, json, os, random, time
 import numpy as np, pandas as pd, torch, torch.nn as nn
 from sklearn.preprocessing import StandardScaler
-import sys
-SEED = int(sys.argv[sys.argv.index('--seed')+1]) if '--seed' in sys.argv else 42
 OUT = "results/conformal"
 FEATS=['capacity_Ah','soh','discharge_dur_s','v_mean_V','v_min_V','ica_peak','ica_peak_V']
 W=20; DATA="data/建模表_v3.csv"; ALPHA=0.10; NB=3
@@ -100,17 +100,25 @@ def gaussian_w(cal_soh, te_soh):
     w=(std_s/std_t)*np.exp(-0.5*((cal_soh-mu_t)/std_t)**2+0.5*((cal_soh-mu_s)/std_s)**2)
     return w/np.mean(w)
 def weighted_cq(res,wts,a):
-    # 加权分位数：按残差升序累加权重，累计到 (1-alpha)·总权重处对应的残差
-    # 就是加权分位数。searchsorted 之后 clamp 到末位，权重复现了 N=1 时
-    # 无位可取的边界情况，clamp 意味着区间取"最重的那个校准样本"
+    # 加权分位数：按残差升序累加权重，取累计权重首次达到 (1-alpha)·(n+1)/n·总权重
+    # 处的残差。均匀权重下该式退化为 ceil((n+1)(1-alpha)) 次序统计量，与 cq() 同口径
+    # （2026-10 修订：旧版阈值漏乘 (n+1)/n，等价于普通 (1-alpha) 分位数，
+    # 均匀权重下比标准保形分位数小一档，区间系统性偏窄）
     order=np.argsort(res); sr=res[order]; sw2=wts[order]
     cw=np.cumsum(sw2); tw=cw[-1]
-    threshold=(1-a)*tw
+    n=len(res)
+    threshold=(1-a)*(n+1)/n*tw
     idx=np.searchsorted(cw,threshold)
     idx=min(idx,len(sr)-1)
     return float(sr[idx])
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--src-cache", default=None,
+                    help="含 t4d_src_<model>_s<seed>.pt 的目录；提供则跳过源域预训练")
+    args = ap.parse_args()
+    SEED = args.seed
     device='cuda' if torch.cuda.is_available() else 'cpu'
     df=pd.read_csv(DATA)
     src=build_windows(df[df['dataset']=='MIT'])
@@ -118,8 +126,14 @@ def main():
     nv=max(1,int(len(sb)*0.1)); Xtr,ytr=cc(src,sb[:-nv]); Xva,yva=cc(src,sb[-nv:])
     sc=StandardScaler().fit(Xtr.reshape(-1,Xtr.shape[2]))
     model=TCN(Xtr.shape[2]).to(device)
-    model=fit(model,sw(sc,Xtr),ytr,120,SEED,device,sw(sc,Xva),yva)
-    print('SRC done',flush=True)
+    cache_p = os.path.join(args.src_cache, "t4d_src_tcn_s%d.pt" % SEED) if args.src_cache else None
+    if cache_p and os.path.exists(cache_p):
+        model.load_state_dict(torch.load(cache_p, map_location=device, weights_only=True))
+        print('[cache] load source model %s' % cache_p, flush=True)
+    else:
+        t0=time.time()
+        model=fit(model,sw(sc,Xtr),ytr,120,SEED,device,sw(sc,Xva),yva)
+        print('SRC done %ds' % (time.time()-t0),flush=True)
     results={'targets':{}}
     for tg in ['CALCE','NASA']:
         tgt=build_windows(df[df['dataset']==tg])
@@ -140,10 +154,12 @@ def main():
         Xte,yte=cc(tgt,te_b); pte=pred(ftm,sw(sct,Xte),device)
         te_res=np.abs(pte-yte)
         te_res_c=chunk_mean(te_res,W); n_t=len(te_res_c)
-        te_soh_c=np.array([np.mean(yte[i*W:(i+1)*W]) for i in range(n_t)])
+        # 权重用的测试侧"SOH"取模型预测的块均值（部署时可得），不用测试真值：
+        # 密度比在目标域内部的校准块与测试块之间估计，属于直推式设定
+        te_pred_c=chunk_mean(pte,W)
         picp_single=float(np.mean(te_res_c<=q_single)); mpiw_single=2*q_single
         # 权重只喂给校准块；测试块不需要权重（覆盖评估就是普通的"落在区间内吗"）
-        w=gaussian_w(cal_soh_c, te_soh_c)
+        w=gaussian_w(cal_soh_c, te_pred_c)
         q_weighted=weighted_cq(cres_c, w, ALPHA)
         picp_weighted=float(np.mean(te_res_c<=q_weighted)); mpiw_weighted=2*q_weighted
         rmse=float(np.sqrt(np.mean((pte-yte)**2)))

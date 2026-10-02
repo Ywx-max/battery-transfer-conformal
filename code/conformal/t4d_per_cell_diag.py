@@ -4,18 +4,20 @@
 背景：表 5 报的是"汇集所有测试窗口"的边际覆盖率。这个口径有两个疑点，
 本脚本逐一诊断：
 
-第一，边际覆盖不等于条件覆盖。边际覆盖 1.00 有没有可能是某几颗电芯撑起来的？
+第一，边际覆盖不等于条件覆盖。边际覆盖有没有可能是某几颗电芯撑起来的？
    把覆盖率拆到每颗测试电芯（cov_tgt / cov_src），看有没有谁被平均了。
-   实测：目标校准下 CALCE 3 颗测试电芯跨 5 种子最低 0.97，没有系统性塌陷。
 
 第二，循环级残差自相关，可交换性不成立。把校准得分聚到电芯级再走保形会怎样？
    每颗校准电芯的残差聚成中位数/p90/均值三种电芯级得分，再算分位数。
-   实测：覆盖同样恢复（约 0.99~1.00）且区间更窄，但 1~2 颗校准电芯只给出
-   1~2 个电芯级得分，分位数退化为最大值，保证是空的，结果只有经验意义。
-   这个"能用但没资格"的边界本身就是结论（论文 4.5 末如实写了）。
+   1~2 颗校准电芯只给出 1~2 个电芯级得分，分位数退化为最大值，保形保证是空的，
+   结果只有经验意义。这个"能用但没资格"的边界本身就是结论（论文 4.5 末如实写了）。
 
-复用 t4_conformal_local 的协议与随机次序：电芯划分与已存 t4_*.json 逐组
-assert 校验一致，区别只是本脚本把逐电芯残差也存了下来（t4 只存汇总指标）。
+口径（2026-10 修订，与 t4 同步）：校准残差一律用**微调后的部署模型**在校准
+电芯上计算（校准与评估同源）。旧版用源模型残差，与 t4 的旧缺陷相同，已作废。
+本脚本把逐电芯残差向量写进 JSON（t4 现在也存）；相对 t4 的增量是按电芯聚合
+的保形变体，以及与 t4_*.json 的逐组划分 assert 校验。
+
+复用 t4_conformal_local 的协议与随机次序：电芯划分由种子唯一决定。
 源模型按 (model, seed) 缓存到 src_cache/，重跑免预训练。
 
 用法：python t4d_per_cell_diag.py --model tcn --seed 42
@@ -227,19 +229,21 @@ def main():
                 "cell split mismatch vs saved t4!"
         Xall_t, _, _ = concat_cells(tgt, tb)
         sc_tgt = StandardScaler().fit(Xall_t.reshape(-1, Xall_t.shape[2]))
-        cal_cells = {}
-        for b in cal_b:
-            Xc, yc, _ = concat_cells(tgt, [b])
-            pred_c = predict(model, std_with(sc_tgt, Xc), device)
-            cal_cells[b] = (np.abs(pred_c - yc)).tolist()
-        cal_res = np.concatenate([np.asarray(v) for v in cal_cells.values()])
-        q_tgt = conformal_q(cal_res)
-
         Xft, yft, _ = concat_cells(tgt, ft_b)
         ft_model = new_model(args.model, Xtr.shape[2]).to(device)
         ft_model.load_state_dict(model.state_dict())
         ft_model = fit_model(ft_model, std_with(sc_tgt, Xft), yft,
                              args.ft_epochs, args.seed, device, lr=3e-4)
+
+        # 校准电芯的部署模型残差（2026-10 修订：旧版在这里误用源模型 predict(model, ...)，
+        # 与 t4 的校准/评估模型错配相同，已改为 ft_model，与 t4 保持同口径）
+        cal_cells = {}
+        for b in cal_b:
+            Xc, yc, _ = concat_cells(tgt, [b])
+            pred_c = predict(ft_model, std_with(sc_tgt, Xc), device)
+            cal_cells[b] = (np.abs(pred_c - yc)).tolist()
+        cal_res = np.concatenate([np.asarray(v) for v in cal_cells.values()])
+        q_tgt = conformal_q(cal_res)
 
         te_cells = {}
         for b in te_b:
@@ -248,12 +252,13 @@ def main():
             te_cells[b] = {"pred": pred_b.tolist(), "y": yb.tolist(),
                            "res": np.abs(pred_b - yb).tolist()}
 
-        # 逐电芯覆盖率：两条校准路由各算一遍；res 里存了逐循环残差，
+        # 逐电芯覆盖率：两条校准路由各算一遍；residuals 存了逐循环残差，
         # 之后想换诊断指标不用重训
         per_cell = {}
         for b, d in te_cells.items():
             res = np.asarray(d["res"])
             per_cell[b] = {"n_windows": int(len(res)),
+                           "residuals": [float(v) for v in res],
                            "cov_tgt": float(np.mean(res <= q_tgt)),
                            "cov_src": float(np.mean(res <= q_src)),
                            "rmse": float(np.sqrt(np.mean(res ** 2)))}
@@ -278,6 +283,8 @@ def main():
             "pooled_cov_tgt": float(np.mean(te_res_all <= q_tgt)),
             "pooled_cov_src": float(np.mean(te_res_all <= q_src)),
             "per_cell": per_cell,
+            "cal_cells_residuals": {b: [float(v) for v in vals]
+                                    for b, vals in cal_cells.items()},
             "cal_cells_residual_summary": {b: {"n": len(v), "median": float(np.median(v)),
                                                "p90": float(np.quantile(v, 0.9)),
                                                "max": float(np.max(v))}

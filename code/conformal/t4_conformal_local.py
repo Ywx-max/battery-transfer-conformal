@@ -2,20 +2,27 @@
 """T4 保形区间双路由对照。论文最核心的一张表（表 5）出自这里。
 
 同一颗微调后的模型、同一批测试窗口，只换校准分位数的来源：
-  源域校准（朴素）  用源域验证残差算分位数 q_src，预期覆盖崩塌
-  目标域校准（本文）用 1~2 颗目标电芯的循环级残差算 q_tgt，预期覆盖恢复
+  源域校准（朴素）  沿用源域验证残差算分位数 q_src，预期覆盖崩塌
+  目标域校准（本文）用 1~2 颗目标电芯的循环级残差算 q_tgt，预期覆盖大幅回升
 
-结论先说：源校准 20/20 组配置全部欠覆盖（最低 0.00），目标校准全部恢复 1.00。
-源域区间窄得可怜（MPIW ~0.003-0.005），域偏移后误差放大数十倍，窄区间全面失守；
-这就是"分布偏移摧毁保形覆盖保证"的直接证据。
+口径（2026-10 修订）：q_tgt 一律用**微调后（部署）模型**在校准电芯上的残差计算。
+拆分保形的有限样本覆盖保证要求校准分数与测试分数出自同一个预测函数，因此
+"用哪个模型评估，就用哪个模型校准"。旧版实现用微调前的源模型残差算 q_tgt、
+却在微调后模型上评估覆盖率，分位数被系统性放大 10 倍以上，机械地把覆盖率
+抬到 ≈1.00，该版本结果作废（旧 t4_*.json 已被本版重跑结果覆盖）。
+修订后的诚实结论：源域校准 20/20 组配置欠覆盖（PICP 0.03~0.58）；目标域校准
+把覆盖率拉回 0.6~0.9，但仍普遍低于名义 0.90——1~2 颗电芯的校准集换不来
+完整的名义覆盖，这与 t4c 系列负结果一致。
 
 口径提醒（论文 3.4 末有声明）：这里报告的是边际经验覆盖率。循环级残差存在
 自相关，严格可交换性不满足，所以是经验证据而非有限样本保证。
 逐电芯诊断与按电芯聚合变体见 t4d_per_cell_diag.py。
 
-划分协议：CALCE (3 微调, 2 校准, 3 测试)、NASA (2, 1, 1)。
+划分协议：CALCE (3 微调, 2 校准, 3 测试)、NASA (2, 1, 1)，划分随种子重新抽取。
 运行：python t4_conformal_local.py --model tcn --seed 42（论文口径：42~46 各一次）
-输出：results/conformal/t4_<model>_s<seed>.json"""
+可选：--src-cache <dir> 指向含 t4d_src_<model>_s<seed>.pt 的目录，跳过源域预训练
+      （缓存模型与 t4d 诊断共用，协议同本脚本；不提供则现场训练）。
+输出：results/conformal/t4_<model>_s<seed>.json（含逐电芯残差向量）"""
 import argparse, json, os, random, time
 import numpy as np
 import pandas as pd
@@ -139,10 +146,10 @@ def concat_cells(cells, bids):
 def conformal_q(residuals, alpha=ALPHA):
     """split conformal 的经验分位数：取第 ceil((n+1)(1-alpha)) 个次序统计量。
 
-    min(n-1, ...) 是工程兜底：n 很小（比如 NASA 校准集只有 1 颗电芯、百余个窗口
-    聚合后仍够用，但电芯级得分的 n 只有 1~2）时，(n+1)(1-alpha) 会越过 n，
-    此时索引被压到最大值，等价于取最差的校准样本。要清醒：这种情况下
-    保形的有限样本保证本来就是空的，n 太小时区间只有经验意义。"""
+    min(n-1, ...) 是工程兜底：n 很小（比如 NASA 校准集只有 1 颗电芯、电芯级
+    得分的 n 只有 1~2）时，(n+1)(1-alpha) 会越过 n，此时索引被压到最大值，
+    等价于取最差的校准样本。要清醒：这种情况下保形的有限样本保证本来就是
+    空的，n 太小时区间只有经验意义。"""
     n = len(residuals)
     idx = min(n - 1, int(np.ceil((n + 1) * (1 - alpha))) - 1)
     return float(np.sort(residuals)[idx])
@@ -154,6 +161,8 @@ def main():
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="results/conformal")
+    ap.add_argument("--src-cache", default=None,
+                    help="含 t4d_src_<model>_s<seed>.pt 的目录；提供则跳过源域预训练")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T4 conformal device={device} model={args.model} alpha={ALPHA}", flush=True)
@@ -167,9 +176,19 @@ def main():
     sc_src = StandardScaler().fit(Xtr.reshape(-1, Xtr.shape[2]))
     Xtr, Xva = std_with(sc_src, Xtr), std_with(sc_src, Xva)
     model = new_model(args.model, Xtr.shape[2]).to(device)
-    t0 = time.time()
-    model = fit_model(model, Xtr, ytr, args.epochs, args.seed, device, Xva, yva)
-    print(f"源域训练完成 {time.time()-t0:.0f}s", flush=True)
+    cache_p = None
+    if args.src_cache:
+        cache_p = os.path.join(args.src_cache, "t4d_src_%s_s%d.pt" % (args.model, args.seed))
+        if os.path.exists(cache_p):
+            model.load_state_dict(torch.load(cache_p, map_location=device, weights_only=True))
+            print(f"[cache] load source model {cache_p}", flush=True)
+        else:
+            print(f"[cache] {cache_p} 不存在，改为现场训练", flush=True)
+            cache_p = None
+    if cache_p is None:
+        t0 = time.time()
+        model = fit_model(model, Xtr, ytr, args.epochs, args.seed, device, Xva, yva)
+        print(f"源域训练完成 {time.time()-t0:.0f}s", flush=True)
     # 源域校准残差 (朴素路由用)
     # 朴素路由的分位数：源域验证集上的绝对残差。源域内模型拟合近乎完美，
     # q_src 非常小，这正是它到了目标域全面失守的伏笔
@@ -189,17 +208,17 @@ def main():
         ft_b, cal_b, te_b = tb[:n_ft], tb[n_ft:n_ft+n_cal], tb[n_ft+n_cal:]
         Xall_t, _, _ = concat_cells(tgt, tb)
         sc_tgt = StandardScaler().fit(Xall_t.reshape(-1, Xall_t.shape[2]))
-        Xcal, ycal, _ = concat_cells(tgt, cal_b)
-        Xcal = std_with(sc_tgt, Xcal)
-        # 本方法路由的分位数：注意用微调前的模型在校准电芯上取残差。
-        # 校准集不参与微调，微调后的模型对校准电芯"过于熟悉"，残差会偏小、区间偏窄
-        cal_res = np.abs(predict(model, Xcal, device) - ycal)
-        q_tgt = conformal_q(cal_res)
         Xft, yft, _ = concat_cells(tgt, ft_b)
         ft_model = new_model(args.model, Xtr.shape[2]).to(device)
         ft_model.load_state_dict(model.state_dict())
         ft_model = fit_model(ft_model, std_with(sc_tgt, Xft), yft,
                              args.ft_epochs, args.seed, device, lr=3e-4)
+        Xcal, ycal, _ = concat_cells(tgt, cal_b)
+        Xcal = std_with(sc_tgt, Xcal)
+        # 目标域校准残差：用微调后的部署模型在校准电芯上取残差（校准与评估同源）。
+        # 校准集 ft_b 与 cal_b 互斥，微调模型没见过校准电芯，不存在"过于熟悉"的问题
+        cal_res = np.abs(predict(ft_model, Xcal, device) - ycal)
+        q_tgt = conformal_q(cal_res)
         Xte, yte, _ = concat_cells(tgt, te_b)
         Xte_s = std_with(sc_tgt, Xte)
         pred = predict(ft_model, Xte_s, device)
@@ -209,18 +228,38 @@ def main():
         cov_tgt = float(np.mean(res_te <= q_tgt)); w_tgt = 2 * q_tgt
         # 源域校准路由 (朴素对照)
         cov_src = float(np.mean(res_te <= q_src)); w_src = 2 * q_src
+        # 逐电芯残差与覆盖率：校准电芯存部署模型残差向量，测试电芯另存逐窗口
+        # 覆盖判定与 RMSE，后续换诊断指标不用重训
+        idx0 = 0
+        per_cell = {}
+        for b in te_b:
+            Xb, yb, _ = concat_cells(tgt, [b])
+            res_b = res_te[idx0:idx0 + len(yb)]; idx0 += len(yb)
+            per_cell[b] = {"n_windows": int(len(res_b)),
+                           "residuals": [float(v) for v in res_b],
+                           "cov_tgt": float(np.mean(res_b <= q_tgt)),
+                           "cov_src": float(np.mean(res_b <= q_src)),
+                           "rmse": float(np.sqrt(np.mean(res_b ** 2)))}
+        cal_cells_res = {}
+        off = 0
+        for b in cal_b:
+            Xb, yb, _ = concat_cells(tgt, [b])
+            cal_cells_res[b] = [float(v) for v in cal_res[off:off + len(yb)]]
+            off += len(yb)
         results["targets"][tgt_name] = {
             "split": {"ft": ft_b, "cal": cal_b, "te": te_b},
             "q_target": q_tgt, "q_src": q_src,
             "point_rmse": float(np.sqrt(np.mean((pred - yte) ** 2))),
             "target_calibrated": {"PICP": cov_tgt, "MPIW": w_tgt},
-            "source_calibrated": {"PICP": cov_src, "MPIW": w_src}}
+            "source_calibrated": {"PICP": cov_src, "MPIW": w_src},
+            "per_cell": per_cell,
+            "cal_cells_residuals": cal_cells_res}
         print(f"[{tgt_name}] 点预测RMSE={results['targets'][tgt_name]['point_rmse']:.4f} | "
               f"目标校准: PICP={cov_tgt:.2f} MPIW={w_tgt:.4f} | "
               f"源校准: PICP={cov_src:.2f} MPIW={w_src:.4f} (名义覆盖 {1-ALPHA:.2f})", flush=True)
     os.makedirs(args.out, exist_ok=True)
-    with open(f"{args.out}/t4_{args.model}_s{args.seed}.json", "w") as f:
-        json.dump(results, f, indent=1)
+    with open(f"{args.out}/t4_{args.model}_s{args.seed}.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=1, ensure_ascii=False)
     print("T4 DONE", flush=True)
 
 if __name__ == "__main__":
