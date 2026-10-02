@@ -226,7 +226,13 @@ for m in ("tcn", "lstm"):
 i9p = RES / "conformal/i9_seeds/i9_summary.json"
 if i9p.exists():
     i9 = json.load(open(i9p, encoding="utf-8"))
+    I9EXP = {"tcn": (50, 0.854, 0.121, 20), "lstm": (50, 0.856, 0.110, 21)}
     for m, v in i9.items():
+        e = I9EXP[m]
+        check("I9 %s 重抽次数" % m, e[0], v["n"], 0)
+        check("I9 %s 覆盖抽样均值" % m, e[1], v["picp_tgt"]["mean"], 5e-4)
+        check("I9 %s 覆盖抽样标准差" % m, e[2], v["picp_tgt"]["std"], 5e-4)
+        check("I9 %s 达标(>=0.90)次数" % m, e[3], round(v["frac_ge_090"] * v["n"]), 0)
         print("[I9] %s n=%d 覆盖均值 %.4f std %.4f q05 %.4f q95 %.4f 达标比例 %.3f"
               % (m, v["n"], v["picp_tgt"]["mean"], v["picp_tgt"]["std"],
                  v["picp_tgt"]["q05"], v["picp_tgt"]["q95"], v["frac_ge_090"]))
