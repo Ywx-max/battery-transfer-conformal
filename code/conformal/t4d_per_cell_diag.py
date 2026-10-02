@@ -169,7 +169,10 @@ def get_source_model(model_name, seed, Xtr, ytr, Xva, yva, input_dim, device, ep
     """源模型按 (model, seed) 落盘缓存。诊断要跑 2 骨干 × 5 种子共 10 次预训练，
     不缓存的话每次调整诊断口径都要重练源域；缓存后增量分析只是秒级推理。"""
     os.makedirs(CACHE, exist_ok=True)
-    p = os.path.join(CACHE, "t4d_src_%s_s%d.pt" % (model_name, seed))
+    # 缓存键含 epochs（改 epochs 不会静默复用旧模型）；旧命名作回退以兼容既有缓存
+    p_new = os.path.join(CACHE, "src_%s_s%d_ep%d.pt" % (model_name, seed, epochs))
+    p_old = os.path.join(CACHE, "t4d_src_%s_s%d.pt" % (model_name, seed))
+    p = p_new if os.path.exists(p_new) else (p_old if os.path.exists(p_old) else p_new)
     model = new_model(model_name, input_dim).to(device)
     if os.path.exists(p):
         model.load_state_dict(torch.load(p, map_location=device, weights_only=True))
@@ -188,10 +191,17 @@ def main():
     ap.add_argument("--epochs", type=int, default=120)
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
+    ap.add_argument("--out", default=OUT, help="结果输出目录")
+    ap.add_argument("--src-cache", default=None, help="统一源模型缓存目录（缺省 <out>/src_cache）")
+    ap.add_argument("--ref-dir", default=REF, help="t4_*.json 参照目录（划分 assert 用）")
     args = ap.parse_args()
+    CACHE = os.path.join(args.out, "src_cache") if args.src_cache is None else args.src_cache
+    OUT = args.out
+    REF = args.ref_dir
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("T4d per-cell diag device=%s model=%s seed=%d" % (device, args.model, args.seed), flush=True)
-    df = pd.read_csv(DATA)
+    df = pd.read_csv(args.data)
 
     src = build_windows_ds(df, "MIT")
     src_bids = sorted(src)

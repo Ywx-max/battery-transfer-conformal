@@ -115,18 +115,26 @@ def weighted_cq(res,wts,a):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
+    ap.add_argument("--out", default=OUT, help="结果输出目录")
     ap.add_argument("--src-cache", default=None,
-                    help="含 t4d_src_<model>_s<seed>.pt 的目录；提供则跳过源域预训练")
+                    help="统一源模型缓存目录；命中则跳过源域预训练")
     args = ap.parse_args()
     SEED = args.seed
+    OUT = args.out
     device='cuda' if torch.cuda.is_available() else 'cpu'
-    df=pd.read_csv(DATA)
+    df=pd.read_csv(args.data)
     src=build_windows(df[df['dataset']=='MIT'])
     sb=sorted(src); random.Random(SEED).shuffle(sb)
     nv=max(1,int(len(sb)*0.1)); Xtr,ytr=cc(src,sb[:-nv]); Xva,yva=cc(src,sb[-nv:])
     sc=StandardScaler().fit(Xtr.reshape(-1,Xtr.shape[2]))
     model=TCN(Xtr.shape[2]).to(device)
-    cache_p = os.path.join(args.src_cache, "t4d_src_tcn_s%d.pt" % SEED) if args.src_cache else None
+    cache_p = None
+    if args.src_cache:
+        os.makedirs(args.src_cache, exist_ok=True)
+        _hit = os.path.join(args.src_cache, "src_tcn_s%d_ep120.pt" % SEED)
+        _legacy = os.path.join(args.src_cache, "t4d_src_tcn_s%d.pt" % SEED)
+        cache_p = _hit if os.path.exists(_hit) else (_legacy if os.path.exists(_legacy) else None)
     if cache_p and os.path.exists(cache_p):
         model.load_state_dict(torch.load(cache_p, map_location=device, weights_only=True))
         print('[cache] load source model %s' % cache_p, flush=True)
@@ -134,6 +142,10 @@ def main():
         t0=time.time()
         model=fit(model,sw(sc,Xtr),ytr,120,SEED,device,sw(sc,Xva),yva)
         print('SRC done %ds' % (time.time()-t0),flush=True)
+        if args.src_cache:
+            _save=os.path.join(args.src_cache,'src_tcn_s%d_ep120.pt' % SEED)
+            torch.save(model.state_dict(), _save)
+            print('[cache] 源模型已写入 %s' % _save, flush=True)
     results={'targets':{}}
     for tg in ['CALCE','NASA']:
         tgt=build_windows(df[df['dataset']==tg])

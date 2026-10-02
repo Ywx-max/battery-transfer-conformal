@@ -19,8 +19,14 @@ import pandas as pd
 CAL = Path("data/raw/calce")
 OUT = Path("data")
 V_LO, V_HI, DV = 3.90, 4.19, 0.010
-RATED = 1.1
+# 额定容量按电芯系列区分（2026-10 CX2 扩充，与 parse_calce.py 同口径）：
+# txt 路径容量 = 放电深度百分比 × 额定容量，CS2=1.1 Ah、CX2=1.35 Ah
+RATED_BY_PREFIX = {"CS2": 1.1, "CX2": 1.35}
 QFRACS = [0.1, 0.3, 0.5, 0.7, 0.9]
+
+
+def rated_for(cell):
+    return RATED_BY_PREFIX[cell.split("_")[0]]
 
 def ica_curve(v, i, t):
     """一段充电数据 → (分箱后电压中心, dQ/dV)。CC 过滤 + 单调化 + 10mV 分箱，
@@ -177,7 +183,7 @@ def process_txt_cell(zip_path, cell):
                         n_cyc += 1
                         rec = rows_by_gid.setdefault(n_cyc, {"battery_id": cell, "cycle": n_cyc})
                         if np.isfinite(cp_dis):
-                            rec["capacity_Ah"] = cp_dis / 100.0 * RATED
+                            rec["capacity_Ah"] = cp_dis / 100.0 * rated_for(cell)
                         if last_ica is not None:
                             rec.update(last_ica)
                         if len(vd_buf) >= 10:
@@ -193,7 +199,7 @@ def process_txt_cell(zip_path, cell):
             n_cyc += 1
             rec = rows_by_gid.setdefault(n_cyc, {"battery_id": cell, "cycle": n_cyc})
             if np.isfinite(cp_dis):
-                rec["capacity_Ah"] = cp_dis / 100.0 * RATED
+                rec["capacity_Ah"] = cp_dis / 100.0 * rated_for(cell)
             if last_ica is not None:
                 rec.update(last_ica)
             if len(vd_buf) >= 10:
@@ -202,7 +208,11 @@ def process_txt_cell(zip_path, cell):
 def main():
     frames = []
     t0 = time.time()
-    for cell in ['CS2_33','CS2_34','CS2_35','CS2_36','CS2_37','CS2_38']:
+    # 2026-10 CX2 扩充（与 parse_calce.py 同一纳入/排除清单）
+    xlsx_cells = ['CS2_33', 'CS2_34', 'CS2_35', 'CS2_36', 'CS2_37', 'CS2_38',
+                  'CX2_16', 'CX2_33', 'CX2_34', 'CX2_35', 'CX2_36', 'CX2_37', 'CX2_38']
+    txt_cells = ['CS2_8', 'CS2_21', 'CX2_31']
+    for cell in xlsx_cells:
         f_feat = process_xlsx_cell(CAL/f'{cell}.zip', cell)
         f_cap = process_xlsx_capacity(CAL/f'{cell}.zip', cell).rename(columns={"gid": "cycle", "capacity_Ah_int": "capacity_Ah"})
         # 顺序对齐：特征流与容量流都按放电循环先后产生，第 k 个对第 k 个。
@@ -218,7 +228,7 @@ def main():
         f_feat_d["soh"] = f_feat_d["capacity_Ah"] / f_feat_d["capacity_Ah"].dropna().iloc[0]
         frames.append(f_feat_d)
         print(f"{cell}: {n} rows | cap {f_feat_d['capacity_Ah'].iloc[0]:.3f}->{f_feat_d['capacity_Ah'].iloc[-1]:.3f} | ica {f_feat_d['ica_main_peak'].median():.2f} | v_q50 {f_feat_d['v_q50'].median():.3f}", flush=True)
-    for cell in ['CS2_8','CS2_21']:
+    for cell in txt_cells:
         m = process_txt_cell(CAL/f'{cell}.zip', cell)
         m["soh"] = m["capacity_Ah"] / m["capacity_Ah"].dropna().iloc[0]
         frames.append(m)

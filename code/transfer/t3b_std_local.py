@@ -146,6 +146,9 @@ def main():
     ap.add_argument("--deterministic", action="store_true",
                     help="开启 cuDNN/PyTorch 确定性算法（诊断跨管线复现性用；默认关闭，"
                          "与论文发布结果的生产环境一致）")
+    ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
+    ap.add_argument("--src-cache", default=None,
+                    help="统一源模型缓存目录（I6）：命中则跳过源域预训练，未命中则训练后写入")
     args = ap.parse_args()
     if args.deterministic:
         # CUBLAS_WORKSPACE_CONFIG 必须在首个 CUDA 操作前设置
@@ -156,7 +159,7 @@ def main():
         print("[deterministic] cuDNN/PyTorch deterministic algorithms ON", flush=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T3b(逐数据集标准化) device={device} model={args.model}", flush=True)
-    df = pd.read_csv(DATA)
+    df = pd.read_csv(args.data)
     src = build_windows_ds(df, "MIT")
     src_bids = sorted(src)
     random.Random(args.seed).shuffle(src_bids)
@@ -167,9 +170,24 @@ def main():
     Xtr, Xva = std_with(sc_src, Xtr), std_with(sc_src, Xva)
     print(f"源域 MIT: 训练电芯 {len(src_bids)-n_va}, 窗口 {len(Xtr)}", flush=True)
     model = new_model(args.model, Xtr.shape[2]).to(device)
-    t0 = time.time()
-    model = fit_model(model, Xtr, ytr, args.epochs, args.seed, device, Xva, yva)
-    print(f"源域训练完成 {time.time()-t0:.0f}s", flush=True)
+    import os as _os
+    _cache_hit = None
+    if args.src_cache:
+        _os.makedirs(args.src_cache, exist_ok=True)
+        _hit = _os.path.join(args.src_cache, f"src_{args.model}_s{args.seed}_ep{args.epochs}.pt")
+        _legacy = _os.path.join(args.src_cache, f"t4d_src_{args.model}_s{args.seed}.pt")
+        _cache_hit = _hit if _os.path.exists(_hit) else (_legacy if _os.path.exists(_legacy) else None)
+    if _cache_hit:
+        model.load_state_dict(torch.load(_cache_hit, map_location=device, weights_only=True))
+        print(f"[cache] 源模型 {_cache_hit}", flush=True)
+    else:
+        t0 = time.time()
+        model = fit_model(model, Xtr, ytr, args.epochs, args.seed, device, Xva, yva)
+        print(f"源域训练完成 {time.time()-t0:.0f}s", flush=True)
+        if args.src_cache:
+            _save = _os.path.join(args.src_cache, f"src_{args.model}_s{args.seed}_ep{args.epochs}.pt")
+            torch.save(model.state_dict(), _save)
+            print(f"[cache] 源模型已写入 {_save}", flush=True)
     results = {"model": args.model, "task": "soh", "protocol": "per-dataset-std",
                "seed": args.seed, "targets": {}}
     for tgt_name in ["CALCE", "NASA"]:

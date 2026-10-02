@@ -35,7 +35,9 @@ import glob
 import os
 import numpy as np
 
-R = "results"
+import argparse
+
+R = "results"  # 可由 --results 覆盖（cx2 模式指向 results_cx2）
 
 
 def load(path):
@@ -223,7 +225,65 @@ def agg_t4c():
     dump(f"{R}/conformal/t4c_multiseed_summary.json", out)
 
 
+def agg_sweep():
+    """I7 覆盖率-校准电芯数扫描汇总（cx2）。"""
+    out = {}
+    for model in ("tcn", "lstm"):
+        for nc in (1, 2, 3, 4, 5):
+            files = sorted(glob.glob(f"{R}/conformal/t4_split_sweep/t4_{model}_s4[2-6]_cal{nc}.json"))
+            for tgt in ("CALCE",):
+                pt, pw, ps = [], [], []
+                for f in files:
+                    d = load(f)
+                    if tgt not in d["targets"]:
+                        continue
+                    t = d["targets"][tgt]
+                    pt.append(t["target_calibrated"]["PICP"])
+                    pw.append(t["target_calibrated"]["MPIW"])
+                    ps.append(t["source_calibrated"]["PICP"])
+                if not pt:
+                    continue
+                v = np.asarray(pt)
+                out.setdefault(model, {})[f"cal{nc}"] = {
+                    "split_ft_cal_te": [16 - 7 - nc, nc, 7],
+                    "picp_tgt": {"mean": float(v.mean()), "std": float(v.std(ddof=1)),
+                                 "all": [float(x) for x in pt]},
+                    "mpiw_tgt_mean": float(np.mean(pw)),
+                    "picp_src_mean": float(np.mean(ps))}
+    dump(f"{R}/conformal/t4_split_sweep/sweep_summary.json", out)
+
+
+def agg_i9():
+    """I9 统计效力：50 次划分重抽的抽样分布（cx2）。"""
+    out = {}
+    for model in ("tcn", "lstm"):
+        pt, pw, rm = [], [], []
+        for s in range(1001, 1051):
+            pth = f"{R}/conformal/i9_seeds/t4_{model}_s{s}.json"
+            if not os.path.exists(pth):
+                continue
+            d = load(pth)
+            t = d["targets"]["CALCE"]
+            pt.append(t["target_calibrated"]["PICP"])
+            pw.append(t["target_calibrated"]["MPIW"])
+            rm.append(t["point_rmse"])
+        v = np.asarray(pt)
+        q = lambda p: float(np.quantile(v, p))
+        out[model] = {"n": len(v),
+                      "picp_tgt": {"mean": float(v.mean()), "std": float(v.std(ddof=1)),
+                                   "q05": q(0.05), "q50": q(0.50), "q95": q(0.95),
+                                   "min": float(v.min()), "max": float(v.max()),
+                                   "all": [float(x) for x in v]},
+                      "frac_ge_090": float(np.mean(v >= 0.90)),
+                      "mpiw_mean": float(np.mean(pw)), "rmse_mean": float(np.mean(rm))}
+    dump(f"{R}/conformal/i9_seeds/i9_summary.json", out)
+
+
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--results", default="results", help="结果根目录（cx2 模式传 results_cx2）")
+    args = ap.parse_args()
+    R = args.results
     agg_t3b()
     agg_t3soh()
     agg_t3x("ablation", "t3c", "ablation_multiseed.json", ["base7"])
@@ -234,4 +294,7 @@ if __name__ == "__main__":
     agg_lobo_csv()
     agg_conformal()
     agg_t4c()
+    if R != "results":
+        agg_sweep()
+        agg_i9()
     print("AGGREGATE DONE")

@@ -146,10 +146,11 @@ def main():
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="results/transfer")
+    ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T3v2 device={device} model={args.model} task={args.task}", flush=True)
-    df = pd.read_csv(DATA)
+    df = pd.read_csv(args.data)
     src = build_windows_ds(df, "MIT", args.task)
     src_bids = sorted(src)
     # 源域内部切 90/10 训练/验证：种子只喂给 random.Random，划分跨运行可复现

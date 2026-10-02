@@ -18,10 +18,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-CAL = Path("data/raw/calce")   # CS2_*.zip 放在这里
+CAL = Path("data/raw/calce")   # CS2_*/CX2_*.zip 放在这里
 OUT = Path("data")             # 解析结果输出目录
 DV = 0.010
-RATED = 1.1
+# 额定容量按电芯系列区分（2026-10 CX2 扩充）：CS2 = 1.1 Ah，CX2 = 1.35 Ah。
+# txt 路径的容量 = 放电深度百分比 × 额定容量，RATED 拿错会把 SOH 系统性算错
+# （CX2 若沿用 1.1，全新电芯只有 0.815 而非 1.0，目标域 SOH 整体下移 18.5%）
+RATED_BY_PREFIX = {"CS2": 1.1, "CX2": 1.35}
+
+
+def rated_for(cell):
+    return RATED_BY_PREFIX[cell.split("_")[0]]
 
 def robust_ica(v, i, t, v_lo=3.90, v_hi=4.19):
     """一段充电数据 → (ICA 主峰高度, 峰位置 V)。
@@ -89,7 +96,7 @@ def calce_txt_full(zip_path, cell):
             n_cyc += 1
             cap_rows.append((n_cyc, cp))
     cap = pd.DataFrame(cap_rows, columns=['cycle_id', 'depth_pct'])
-    cap['capacity_Ah'] = cap['depth_pct'] / 100.0 * RATED
+    cap['capacity_Ah'] = cap['depth_pct'] / 100.0 * rated_for(cell)
     cap = cap[cap['capacity_Ah'] > 0.2]
     ica = pd.DataFrame(ica_rows, columns=['cycle_id', 'ica_peak', 'ica_peak_V', 'charge_dur_s'])
     ica = ica.dropna(subset=['ica_peak']).groupby('cycle_id').agg(
@@ -127,6 +134,14 @@ def calce_xlsx_full(zip_path, cell):
     cap = pd.DataFrame(cap_rows, columns=['cycle_id', 'c']).groupby('cycle_id')['c'].sum().reset_index()
     cap.columns = ['cycle_id', 'capacity_Ah']
     cap = cap[cap['capacity_Ah'] > 0.2]
+    # 物理不可能的容量行剔除（CX2_16 的 22.7h 搁置段上 Arbin 累计计数器差值
+    # 产生 12.5 Ah 行；放电不可能超过 1.5×额定）。行号保持不动，仅删行，
+    # 因此 CS2（最大容量 ~1.25 Ah < 1.5×1.1）完全不受影响
+    _bad = cap['capacity_Ah'] > 1.5 * rated_for(cell)
+    if _bad.any():
+        print(f"  [物理过滤] {cell}: 剔除 {int(_bad.sum())} 行超物理容量 "
+              f"(max {cap.loc[_bad, 'capacity_Ah'].max():.2f} Ah)", flush=True)
+        cap = cap[~_bad]
     ica = pd.DataFrame(ica_rows, columns=['cycle_id', 'pk', 'pv', 'dur']).dropna(subset=['pk'])
     ica = ica.groupby('cycle_id').agg(ica_peak=('pk','mean'), ica_peak_V=('pv','mean'),
                                       charge_dur_s=('dur','sum')).reset_index()
@@ -137,8 +152,12 @@ def calce_xlsx_full(zip_path, cell):
 
 def main():
     frames, t0 = [], time.time()
-    for cell in ['CS2_8','CS2_21','CS2_33','CS2_34','CS2_35','CS2_36','CS2_37','CS2_38']:
-        f = calce_txt_full(CAL/f'{cell}.zip', cell) if cell in ('CS2_8','CS2_21') \
+    # 2026-10 CX2 扩充：纳入与 CS2 同条件的 8 颗（16/31/33/34/35/36/37/38），
+    # 排除脉冲/温度循环/3C 工况电芯（CX2_3/4/8/32，论文 4.1 有排除准则）
+    cells = ['CS2_8', 'CS2_21', 'CS2_33', 'CS2_34', 'CS2_35', 'CS2_36', 'CS2_37', 'CS2_38',
+             'CX2_16', 'CX2_31', 'CX2_33', 'CX2_34', 'CX2_35', 'CX2_36', 'CX2_37', 'CX2_38']
+    for cell in cells:
+        f = calce_txt_full(CAL/f'{cell}.zip', cell) if cell in ('CS2_8','CS2_21','CX2_31') \
             else calce_xlsx_full(CAL/f'{cell}.zip', cell)
         frames.append(f)
         print(f"{cell}: {len(f)} 行 | {f['capacity_Ah'].iloc[0]:.3f}->{f['capacity_Ah'].iloc[-1]:.3f} Ah | ica中位 {f['ica_peak'].median():.2f}", flush=True)

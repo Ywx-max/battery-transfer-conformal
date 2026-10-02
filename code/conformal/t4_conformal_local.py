@@ -161,8 +161,13 @@ def main():
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="results/conformal")
+    ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
     ap.add_argument("--src-cache", default=None,
-                    help="含 t4d_src_<model>_s<seed>.pt 的目录；提供则跳过源域预训练")
+                    help="统一源模型缓存目录；命中则跳过源域预训练")
+    ap.add_argument("--split-calce", default="7,2,7",
+                    help="CALCE 微调/校准/测试电芯数（I7 新协议 7/2/7；论文旧版为 3/2/3）")
+    ap.add_argument("--split-nasa", default="2,1,1",
+                    help="NASA 微调/校准/测试电芯数")
     ap.add_argument("--n-cal", type=int, default=None,
                     help="扫描校准电芯数（4.5 节覆盖-校准量关系）：给定后 CALCE 用 "
                          "(4, N, 4-N)、NASA 用 (1, N, 3-N) 划分，结果另存 "
@@ -170,7 +175,7 @@ def main():
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T4 conformal device={device} model={args.model} alpha={ALPHA}", flush=True)
-    df = pd.read_csv(DATA)
+    df = pd.read_csv(args.data)
     src = build_windows_ds(df, "MIT")
     src_bids = sorted(src)
     random.Random(args.seed).shuffle(src_bids)
@@ -182,17 +187,23 @@ def main():
     model = new_model(args.model, Xtr.shape[2]).to(device)
     cache_p = None
     if args.src_cache:
-        cache_p = os.path.join(args.src_cache, "t4d_src_%s_s%d.pt" % (args.model, args.seed))
-        if os.path.exists(cache_p):
+        os.makedirs(args.src_cache, exist_ok=True)
+        _hit = os.path.join(args.src_cache, f"src_{args.model}_s{args.seed}_ep{args.epochs}.pt")
+        _legacy = os.path.join(args.src_cache, f"t4d_src_{args.model}_s{args.seed}.pt")
+        cache_p = _hit if os.path.exists(_hit) else (_legacy if os.path.exists(_legacy) else None)
+        if cache_p:
             model.load_state_dict(torch.load(cache_p, map_location=device, weights_only=True))
             print(f"[cache] load source model {cache_p}", flush=True)
         else:
-            print(f"[cache] {cache_p} 不存在，改为现场训练", flush=True)
-            cache_p = None
+            print(f"[cache] {args.src_cache} 无命中，改为现场训练", flush=True)
     if cache_p is None:
         t0 = time.time()
         model = fit_model(model, Xtr, ytr, args.epochs, args.seed, device, Xva, yva)
         print(f"源域训练完成 {time.time()-t0:.0f}s", flush=True)
+        if args.src_cache:
+            _save = os.path.join(args.src_cache, f"src_{args.model}_s{args.seed}_ep{args.epochs}.pt")
+            torch.save(model.state_dict(), _save)
+            print(f"[cache] 源模型已写入 {_save}", flush=True)
     # 源域校准残差 (朴素路由用)
     # 朴素路由的分位数：源域验证集上的绝对残差。源域内模型拟合近乎完美，
     # q_src 非常小，这正是它到了目标域全面失守的伏笔
@@ -201,14 +212,14 @@ def main():
     print(f"源域校准分位数 q_src={q_src:.4f}", flush=True)
 
     results = {"model": args.model, "alpha": ALPHA, "q_src": q_src, "targets": {}}
-    for tgt_name, split in [("CALCE", (3, 2, 3)), ("NASA", (2, 1, 1))]:
-        if args.n_cal is not None:
-            # 覆盖-校准量扫描：固定微调/测试的一端，只动校准电芯数。
-            # 同一种子下洗牌次序一致，因此 CALCE 三档共享同一批微调电芯，可横向比较
-            n_total = 8 if tgt_name == "CALCE" else 4
-            n_ft = 4 if tgt_name == "CALCE" else 1
-            split = (n_ft, args.n_cal, n_total - n_ft - args.n_cal)
-            if split[1] < 1 or split[2] < 1:
+    _splits = {"CALCE": tuple(int(x) for x in args.split_calce.split(",")),
+               "NASA": tuple(int(x) for x in args.split_nasa.split(","))}
+    for tgt_name, split in [("CALCE", _splits["CALCE"]), ("NASA", _splits["NASA"])]:
+        if args.n_cal is not None and tgt_name == "CALCE":
+            # 覆盖-校准量扫描（I7）：测试电芯固定 7，微调 = 16-7-cal，
+            # 校准 1..5 档共享同一批测试电芯，覆盖曲线可比
+            split = (16 - 7 - args.n_cal, args.n_cal, 7)
+            if split[0] < 1 or split[1] < 1 or split[2] < 1:
                 print(f"[{tgt_name}] n_cal={args.n_cal} 划分非法, 跳过", flush=True)
                 continue
         tgt = build_windows_ds(df, tgt_name)

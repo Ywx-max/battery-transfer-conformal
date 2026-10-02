@@ -11,11 +11,9 @@ SOH 抖动太大会把箱子搅浑；这也是标题里"修复长度对齐"的�
 
 运行：python t4c_mondrian_local.py --seed 42
 输出：results/conformal/t4c_mondrian_s<seed>.json（single = 单一分位数基线对照）"""
-import json, os, random, time
+import json, os, random, time, argparse
 import numpy as np, pandas as pd, torch, torch.nn as nn
 from sklearn.preprocessing import StandardScaler
-import sys
-SEED = int(sys.argv[sys.argv.index('--seed')+1]) if '--seed' in sys.argv else 42
 OUT = "results/conformal"
 FEATS=['capacity_Ah','soh','discharge_dur_s','v_mean_V','v_min_V','ica_peak','ica_peak_V']
 # NB=3：按 SOH 分 3 箱（分位点 1/3、2/3 处切）。校准电芯只有 1~2 颗时每箱样本极少，
@@ -89,15 +87,38 @@ def chunk_res(res, W=20):
     n=len(res)//W
     return np.array([np.mean(res[i*W:(i+1)*W]) for i in range(n)])
 def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--seed', type=int, default=42)
+    ap.add_argument('--data', default=DATA)
+    ap.add_argument('--out', default=OUT)
+    ap.add_argument('--src-cache', default=None)
+    args=ap.parse_args()
+    SEED=args.seed
+    OUT=args.out
     device='cuda' if torch.cuda.is_available() else 'cpu'
-    df=pd.read_csv(DATA)
+    df=pd.read_csv(args.data)
     src=build_windows(df[df['dataset']=='MIT'])
     sb=sorted(src); random.Random(SEED).shuffle(sb)
     nv=max(1,int(len(sb)*0.1)); Xtr,ytr=cc(src,sb[:-nv]); Xva,yva=cc(src,sb[-nv:])
     sc=StandardScaler().fit(Xtr.reshape(-1,Xtr.shape[2]))
     model=TCN(Xtr.shape[2]).to(device)
-    model=fit(model,sw(sc,Xtr),ytr,120,SEED,device,sw(sc,Xva),yva)
-    print('SRC done',flush=True)
+    _cache_hit=None
+    if args.src_cache:
+        os.makedirs(args.src_cache, exist_ok=True)
+        _hit=os.path.join(args.src_cache,'src_tcn_s%d_ep120.pt' % SEED)
+        _legacy=os.path.join(args.src_cache,'t4d_src_tcn_s%d.pt' % SEED)
+        _cache_hit=_hit if os.path.exists(_hit) else (_legacy if os.path.exists(_legacy) else None)
+    if _cache_hit:
+        model.load_state_dict(torch.load(_cache_hit, map_location=device, weights_only=True))
+        print('[cache] load source model %s' % _cache_hit, flush=True)
+    else:
+        t0=time.time()
+        model=fit(model,sw(sc,Xtr),ytr,120,SEED,device,sw(sc,Xva),yva)
+        print('SRC done %ds'%(time.time()-t0),flush=True)
+        if args.src_cache:
+            _save=os.path.join(args.src_cache,'src_tcn_s%d_ep120.pt' % SEED)
+            torch.save(model.state_dict(), _save)
+            print('[cache] 源模型已写入 %s' % _save, flush=True)
     results={'targets':{}}
     for tg in ['CALCE','NASA']:
         tgt=build_windows(df[df['dataset']==tg])
