@@ -137,13 +137,14 @@ _r1 = load("transfer/t3b_tcn_s42_repeat1.json")["targets"]["CALCE"]["zero_shot"]
 _r2 = load("transfer/t3b_tcn_s42_repeat2.json")["targets"]["CALCE"]["zero_shot"]["rmse"]
 check("4.8 同种子重复波动 %", 14.0, abs(_r1 - _r2) / ((_r1 + _r2) / 2) * 100, 0.05)
 
-# 4.8 两套脚本管线的源域预训练不可逐位复现（同种子微调 RMSE 相差最高 50%）
+# 4.8 两套脚本管线的源域预训练不可逐位复现（同种子微调 RMSE 相差最高 57%）
 _pipe = []
-for s in (42, 43, 44, 45, 46):
-    _a = load("transfer/t3b_tcn_s%d.json" % s)["targets"]["CALCE"]["fine_tune"]["rmse"]
-    _bb = load("ablation/t3e_base7_tcn_s%d.json" % s)["targets"]["CALCE"]["fine_tune"]["rmse"]
-    _pipe.append(abs(_a - _bb) / min(_a, _bb) * 100)
-check("4.8 两套管线微调差异最大 %", 50.0, max(_pipe), 1.0)
+for _tgt in ("CALCE", "NASA"):
+    for s in (42, 43, 44, 45, 46):
+        _a = load("transfer/t3b_tcn_s%d.json" % s)["targets"][_tgt]["fine_tune"]["rmse"]
+        _bb = load("ablation/t3e_base7_tcn_s%d.json" % s)["targets"][_tgt]["fine_tune"]["rmse"]
+        _pipe.append(abs(_a - _bb) / min(_a, _bb) * 100)
+check("4.8 两套管线微调差异最大 %", 57.0, max(_pipe), 1.0)
 
 # ---------- 表 2：LOBO 逐电芯分布（119 折） ----------
 for key, f, row in [("tcn", "baselines/lobo_tcn.jsonl", (18.15, 50.42, 80.90, 105.86, 92.47, 66.17)),
