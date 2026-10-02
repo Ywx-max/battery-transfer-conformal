@@ -31,7 +31,8 @@
 
 5. conformal/          保形区间
    t4_conformal_local.py 双路由对照（表 5，最核心；2026-10 修订：目标域校准分位数
-                         由部署模型自身残差计算，与评估同源；支持 --src-cache 复用源模型）
+                         由部署模型自身残差计算，与评估同源；支持 --src-cache 复用源模型；
+                         --n-cal N 扫描校准电芯数→t4_split_sweep/，--deterministic 开确定性算法）
    t4c_mondrian_local.py 条件化收窄之一：SOH 分箱
    t4c_weighted_local.py 条件化收窄之二：密度比加权（2026-10 修订：测试侧用预测 SOH，
                          不使用测试真值；加权分位数 off-by-one 已修正）

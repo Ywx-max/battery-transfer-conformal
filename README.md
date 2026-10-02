@@ -4,13 +4,13 @@
 
 Code and analysis pipeline for the paper:
 
-> 杨王兴 (Yang Wangxing). 基于跨化学体系预训练与保形校准的锂离子电池寿命概率预测
-> (Probabilistic remaining useful life prediction of lithium-ion batteries via
+> 杨王兴 (Yang Wangxing). 基于跨化学体系预训练与保形校准的锂离子电池健康状态概率预测
+> (Probabilistic state-of-health prediction of lithium-ion batteries via
 > cross-chemistry pre-training and conformal recalibration). 2026.
 
 ## 项目简介
 
-跨化学体系（磷酸铁锂 → 钴酸锂）的电池寿命概率预测：用大规模 LFP 数据预训练，
+跨化学体系（磷酸铁锂 → 钴酸锂）的电池健康状态概率预测：用大规模 LFP 数据预训练，
 迁移到只有几颗电芯的 LCO 目标域微调，再用保形预测给出带覆盖保证的区间。
 核心发现与仓库的对应关系：
 
@@ -108,7 +108,7 @@ for all content.
   （学术不端，作者保留追究权利）
 - 引用格式见 [CITATION.cff](CITATION.cff)（GitHub 右上角 "Cite this repository" 按钮可直接导出 BibTeX）
 
-论文《基于跨化学体系预训练与保形校准的锂离子电池寿命概率预测》的文本不在本仓库中，
+论文《基于跨化学体系预训练与保形校准的锂离子电池健康状态概率预测》的文本不在本仓库中，
 其著作权归作者（杨王兴）所有；本仓库代码仅供学习、复现与学术交流。
 
 **联系方式**：2024212097@bupt.cn（授权咨询、学术交流、侵权举报）

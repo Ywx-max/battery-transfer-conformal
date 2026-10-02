@@ -59,6 +59,14 @@
 > t4c_weighted_*.json 同批重跑（移除测试真值泄漏 + 修正加权分位数 off-by-one）；
 > t4c_mondrian_*.json 无缺陷、保留原始运行。
 
+## 补充实验（2026-10-02，论文 4.5/4.9 节引用）
+
+| 文件 | 说明 |
+|---|---|
+| t4_split_sweep/ | 覆盖率-校准电芯数扫描（`t4_conformal_local.py --n-cal`）：固定微调电芯数（CALCE 4 / NASA 1），校准电芯 1→3 档，2 骨干 × 5 种子；`sweep_summary.json` 为聚合 |
+| t4_gru_s42-46.json | GRU 骨干的稳健性复核（双路由，5 种子，源域预训练同协议重跑） |
+| diag_deterministic/ | 跨管线复现性诊断：t3b/t3e 同种子 `--deterministic` 开关重跑对照（正文 4.9 引用） |
+
 ## 其他
 
 - `early_pred_summary.json` / `early_pred_results.csv`：4.7 节早期寿命预测（ΔQ 特征 + 岭回归，逐电芯预测明细 119 颗；log10 RMSE 0.117 / 循环 RMSE 141.7 / MAPE 19.5%；脚本 `code/early_pred/t5_early_pred.py`）

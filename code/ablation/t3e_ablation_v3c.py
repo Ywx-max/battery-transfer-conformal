@@ -138,7 +138,17 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--feats", default="base7", choices=["base7", "curve14"])
     ap.add_argument("--out", default="results/ablation")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="开启 cuDNN/PyTorch 确定性算法（诊断跨管线复现性用；默认关闭，"
+                         "与论文发布结果的生产环境一致）")
     args = ap.parse_args()
+    if args.deterministic:
+        # CUBLAS_WORKSPACE_CONFIG 必须在首个 CUDA 操作前设置
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        print("[deterministic] cuDNN/PyTorch deterministic algorithms ON", flush=True)
     # 特征集在运行时切换：base7 = 论文的"基础 7 维"，curve14 = "曲线增强 14 维"
     global FEATS
     FEATS = FEATS_BASE7 if args.feats == "base7" else FEATS_CURVE14

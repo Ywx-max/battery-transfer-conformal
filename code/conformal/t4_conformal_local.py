@@ -163,6 +163,10 @@ def main():
     ap.add_argument("--out", default="results/conformal")
     ap.add_argument("--src-cache", default=None,
                     help="含 t4d_src_<model>_s<seed>.pt 的目录；提供则跳过源域预训练")
+    ap.add_argument("--n-cal", type=int, default=None,
+                    help="扫描校准电芯数（4.5 节覆盖-校准量关系）：给定后 CALCE 用 "
+                         "(4, N, 4-N)、NASA 用 (1, N, 3-N) 划分，结果另存 "
+                         "t4_<model>_s<seed>_cal<N>.json；缺省保持论文表 5 的划分不变")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T4 conformal device={device} model={args.model} alpha={ALPHA}", flush=True)
@@ -198,6 +202,15 @@ def main():
 
     results = {"model": args.model, "alpha": ALPHA, "q_src": q_src, "targets": {}}
     for tgt_name, split in [("CALCE", (3, 2, 3)), ("NASA", (2, 1, 1))]:
+        if args.n_cal is not None:
+            # 覆盖-校准量扫描：固定微调/测试的一端，只动校准电芯数。
+            # 同一种子下洗牌次序一致，因此 CALCE 三档共享同一批微调电芯，可横向比较
+            n_total = 8 if tgt_name == "CALCE" else 4
+            n_ft = 4 if tgt_name == "CALCE" else 1
+            split = (n_ft, args.n_cal, n_total - n_ft - args.n_cal)
+            if split[1] < 1 or split[2] < 1:
+                print(f"[{tgt_name}] n_cal={args.n_cal} 划分非法, 跳过", flush=True)
+                continue
         tgt = build_windows_ds(df, tgt_name)
         tb = sorted(tgt)
         n_ft, n_cal, n_te = split
@@ -258,7 +271,8 @@ def main():
               f"目标校准: PICP={cov_tgt:.2f} MPIW={w_tgt:.4f} | "
               f"源校准: PICP={cov_src:.2f} MPIW={w_src:.4f} (名义覆盖 {1-ALPHA:.2f})", flush=True)
     os.makedirs(args.out, exist_ok=True)
-    with open(f"{args.out}/t4_{args.model}_s{args.seed}.json", "w", encoding="utf-8") as f:
+    suffix = "_cal%d" % args.n_cal if args.n_cal is not None else ""
+    with open(f"{args.out}/t4_{args.model}_s{args.seed}{suffix}.json", "w", encoding="utf-8") as f:
         json.dump(results, f, indent=1, ensure_ascii=False)
     print("T4 DONE", flush=True)
 

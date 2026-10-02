@@ -143,7 +143,17 @@ def main():
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="results/transfer")
+    ap.add_argument("--deterministic", action="store_true",
+                    help="开启 cuDNN/PyTorch 确定性算法（诊断跨管线复现性用；默认关闭，"
+                         "与论文发布结果的生产环境一致）")
     args = ap.parse_args()
+    if args.deterministic:
+        # CUBLAS_WORKSPACE_CONFIG 必须在首个 CUDA 操作前设置
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        print("[deterministic] cuDNN/PyTorch deterministic algorithms ON", flush=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"T3b(逐数据集标准化) device={device} model={args.model}", flush=True)
     df = pd.read_csv(DATA)
