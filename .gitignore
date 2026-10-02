@@ -3,6 +3,7 @@ __pycache__/
 data/*
 *.csv
 !results/**/*.csv
+!results_cx2/**/*.csv
 !data/*.csv.gz
 !data/mit_dq_early.csv
 *.xlsx

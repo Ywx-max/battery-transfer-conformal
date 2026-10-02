@@ -10,7 +10,7 @@
    parse_calce_v2.py     CALCE 重构统一版（电流积分容量 + v_q 曲线特征）→ calce_full_v2.csv
    parse_nasa.py         NASA 4 颗 → nasa_capacity.csv（含 EOL/RUL 定义；NASA 的 EOL 取 70%）
    features_nasa.py      NASA 循环级特征（含 ICA）→ nasa_features.csv
-   extract_mit_dq_early.py  MIT 前 100 循环 ΔQ 特征（4.7 节输入；见其 docstring 的"与随
+   extract_mit_dq_early.py  MIT 前 100 循环 ΔQ 特征（4.8 节输入；见其 docstring 的"与随
                             仓库数据的关系"说明，随仓库 CSV 为论文冻结版）
         ↓ 合并成一张建模表（三个数据集统一列名：dataset/battery_id/cycle/...）
    build_modeling_table.py  按上一步的产物合并出 建模表_v3.csv / 建模表_v3c.csv
@@ -36,15 +36,16 @@
    t4c_mondrian_local.py 条件化收窄之一：SOH 分箱
    t4c_weighted_local.py 条件化收窄之二：密度比加权（2026-10 修订：测试侧用预测 SOH，
                          不使用测试真值；加权分位数 off-by-one 已修正）
-   t4d_per_cell_diag.py  逐电芯覆盖率与按电芯聚合变体（论文 4.5 末；t4/t4d 的 json
+   t4d_per_cell_diag.py  逐电芯覆盖率与按电芯聚合变体（论文 4.6 节；t4/t4d 的 json
                          均存逐电芯残差向量）
 
-6. early_pred/          早期寿命预测（论文 4.7）
+6. early_pred/          早期寿命预测（论文 4.8）
    t5_early_pred.py      ΔQ 特征 + 岭回归，留一电芯 119 颗（输入 data/mit_dq_early.csv）
 
 7. checks/
    final_data_check.py   实验结果 JSON vs 论文数字，75 项逐项核对（约 3 秒，需论文源文件）
    verify_results.py     论文数字与 results/ 汇总文件逐项对拍 179 项（无需论文源文件、无 GPU）
+   verify_results_cx2.py  投稿版口径：论文数字与 results_cx2/ 汇总文件逐项对拍 126 项
    aggregate_results.py  聚合脚本：从逐种子原始文件再生全部多种子汇总文件（约 1 秒）
 ```
 
@@ -69,9 +70,11 @@ LaTeX 源），克隆仓库跑不了它，但结果文件本身可以直接看�
   t3b/t4*/t4d = 源域、目标域各用各的 scaler（逐数据集协议，表 3 主表）。
 - **保形校准（2026-10 修订）**：目标域校准分位数一律由部署模型（微调后）自身在
   校准电芯上的残差计算（拆分保形的同源前提）。旧版用微调前模型残差的结果作废。
-- **GPU 非确定性**：同种子重跑指标有小幅浮动（论文 4.8 有讨论）；两套脚本管线的
-  源域预训练不可逐位复现（同种子微调 RMSE 相差最高 57%），
-  所以任何"小数第 3 位"的比较都不该当真。
+- **GPU 非确定性**：同种子重跑指标有小幅浮动（论文 4.9 有讨论），任何"小数第 3 位"
+  的比较都不该当真。**早期版本**两套脚本管线各自预训练源模型，同种子微调 RMSE
+  相差最高 57%；**投稿版已统一源模型缓存**（全部脚本共用同一批 MIT 预训练权重），
+  该差异不复存在，表 3 与表 6 的同配置数值不再有管线间分歧（历史诊断见
+  `results/diag_deterministic/`）。
 
 ## 复现边界
 
@@ -105,7 +108,7 @@ LaTeX 源），克隆仓库跑不了它，但结果文件本身可以直接看�
   t3b/t3e/t4/t4d/t4c 共用同一批 MIT 预训练权重——此前"两套管线相差最高 57%"的问题随之消除。
 - 新结果目录：results_cx2/（结构与 results/ 镜像；含 t4_split_sweep 校准电芯数扫描、
   i9_seeds 50 次划分重抽）。旧 results/ 为 8 电芯协议历史版本，冻结保留。
-- 复算：python code/checks/verify_results.py --results results_cx2（118 项）；
+- 复算：python code/checks/verify_results.py --results results_cx2（126 项）；
   不带参数仍对旧口径核对 179/179。
 - 表 5 划分（CX2 版）：CALCE 7/2/7、NASA 2/1/1（--split-calce/--split-nasa 可改）；
   t4c 协议（CX2 版）：CALCE 5/5/6、NASA 1/1/2。

@@ -16,14 +16,15 @@ Code and analysis pipeline for the paper:
 
 | 论文中的结论 | 代码在哪儿 |
 |---|---|
-| 预训练价值随目标域数据减少而放大（NASA 1/15.0） | `code/transfer/t3_transfer_local.py` |
-| 源域校准区间全面崩塌、目标域再校准大幅修复覆盖但仍低于名义 0.90（表 5） | `code/conformal/t4_conformal_local.py` |
-| 逐电芯覆盖诊断 + 按电芯聚合保形变体（4.5 末） | `code/conformal/t4d_per_cell_diag.py` |
+| 预训练价值随目标域数据减少而放大（NASA 1/14.9；CALCE 微调电芯 4→8 后增益由 4.90 收缩至 2.23，呈剂量-响应） | `code/transfer/t3_transfer_local.py` |
+| 源域校准区间覆盖失效（NASA 0.007–0.315，CALCE 0.40–0.89）、目标域再校准回升至 0.64–1.00（14/20 达名义；随机划分下达标约四成）（表 5） | `code/conformal/t4_conformal_local.py` |
+| 逐电芯覆盖诊断 + 按电芯聚合保形变体（4.6 节） | `code/conformal/t4d_per_cell_diag.py` |
 | 漂移分解：量纲漂移 vs 关系漂移（表 4） | `code/transfer/t3b_std_local.py` |
-| 特征消融：曲线特征跨域有害（表 6） | `code/ablation/` |
-| 早期寿命预测：ΔQ 特征 + 岭回归（4.7） | `code/early_pred/t5_early_pred.py` |
+| 特征消融：曲线特征在微调路径上方向一致但**未达显著**（p=0.070–0.212，表 6） | `code/ablation/` |
+| 早期寿命预测：ΔQ 特征 + 岭回归（4.8） | `code/early_pred/t5_early_pred.py` |
 | 论文数字逐项自检（75 项；路径绑定作者本机布局，仓库内不可直接运行） | `code/checks/final_data_check.py` |
-| 论文数字与仓库结果逐项对拍（179 项，只读本仓库数据） | `code/checks/verify_results.py` |
+| 论文数字与仓库结果逐项对拍（**投稿版 126 项**，只读本仓库数据） | `code/checks/verify_results_cx2.py`（或 `verify_results.py --results results_cx2`） |
+| 8 电芯历史口径逐项对拍（179 项） | `code/checks/verify_results.py` |
 | 从逐种子原始文件再生全部多种子汇总文件 | `code/checks/aggregate_results.py` |
 
 ## 仓库结构
@@ -37,9 +38,11 @@ code/
   ablation/    特征丰富度消融（3 个数据版本）
   conformal/   保形区间：双路由对照 / Mondrian / 加权 / 逐电芯诊断
   checks/      数据一致性自检（本地核对 + 一键复算）
-data/                派生数据：两张建模表（.csv.gz）与 ΔQ 特征表，见 DATA.md
-results/             论文全部实验结果的原始 JSON（对应关系见 results/README.md）
-figures_reproduce/   论文 4 张图的复现脚本（直接读 results/）
+data/                派生数据：建模表（.csv.gz，含 CX2 扩充版）与 ΔQ 特征表，见 DATA.md
+results/             8 电芯口径实验结果（历史基线，冻结保留）
+results_cx2/         ★ 投稿版实验结果（CALCE 16 颗；含 t4_split_sweep 校准电芯数扫描、
+                     i9_seeds 划分重抽；对应关系见 results/README.md 末节）
+figures_reproduce/   论文 5 张图的复现脚本
 ```
 
 脚本之间没有复杂的包依赖：单个文件拷出去，配上数据路径就能跑。
@@ -55,6 +58,8 @@ figures_reproduce/   论文 4 张图的复现脚本（直接读 results/）
   4.5 逐电芯诊断与条件化收窄、4.6 配对 t 检验、4.7 早期预测），不需要原始数据集、
   不需要 GPU、也不需要论文源文件，纯标准库约 1 秒。逐行给出「论文位置 | 论文数值 |
   由本仓库数据重算」，全部一致时返回码 0。它核对"论文数字有没有抄对"，不验证实验方法。
+- `verify_results_cx2.py`（等价于 `verify_results.py --results results_cx2`）：**投稿版口径**，
+  126 个关键数字与 `results_cx2/` 汇总文件逐项对拍，同样无需原始数据集、无需 GPU。
 - `aggregate_results.py`：**聚合层**。论文引用的全部多种子汇总 JSON/CSV 都能从
   `results/` 下的逐种子原始文件再生（论文数字 → 汇总文件 → 逐种子文件，三层对齐），
   约 1 秒、纯 numpy。（`final_data_check.py` 是同一核对的作者本地版，依赖作者机器的
@@ -69,14 +74,14 @@ figures_reproduce/   论文 4 张图的复现脚本（直接读 results/）
 | Dataset | Cells | Chemistry | Source |
 |---|---|---|---|
 | MIT-Stanford | 124 | LFP | Severson et al., *Nature Energy* 2019 ([data](https://data.matr.io/1)) |
-| CALCE CS2 | 8 | LCO | [CALCE Battery Group, U. Maryland](https://calce.umd.edu/battery-data) |
+| CALCE CS2 + CX2 | 16 | LCO | [CALCE Battery Group, U. Maryland](https://calce.umd.edu/battery-data) |
 | NASA PCoE | 4 | LCO | [NASA PCoE Data Repository](https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/) |
 
 获取方式与目录结构见 `DATA.md`。
 
-论文自己的实验结果放在 `results/`，是各实验脚本的原始输出，哪个文件对应论文哪张表
+论文自己的实验结果放在 `results_cx2/`（**投稿版**，CALCE 16 颗），`results/` 为 8 电芯历史口径冻结版；两者都是各实验脚本的原始输出，哪个文件对应论文哪张表
 在 `results/README.md` 里列了。`figures_reproduce/make_figures.py` 直接从 `results/`
-读数据重画论文全部 4 张图。
+读数据重画论文全部 5 张图。
 
 ## 运行环境
 

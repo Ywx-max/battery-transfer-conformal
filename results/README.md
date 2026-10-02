@@ -14,7 +14,7 @@
 | lobo_tcn_s42/43/44.jsonl | 图 1 的 357 折合并分布 + 4.2 节的跨种子复核（复现运行，每行一折） |
 | lobo_lstm.jsonl / lobo_transformer.jsonl | 表 2 的 LSTM / Transformer 行（各 119 折，原运行） |
 | lobo_final_multiseed.json | 4.2 节跨种子复核（TCN 3 次重复 92.45±0.98；LSTM/Transformer 仅原运行 n_runs=1） |
-| lobo_3model_final.csv | 4.8 节双模型互补性（r=0.699）与择优上界的逐电芯数据 |
+| lobo_3model_final.csv | 表 2 末行"逐电芯三模型择优（上界）"的逐电芯 RMSE 数据 |
 
 > 版本说明：早期版本汇总里的 "LSTM/Transformer/集成各 2 次重复"（96.21±1.92 等）
 > 无逐折原始文件支撑，已从汇总与论文中撤下（aggregate_results.py 只再生有 jsonl
@@ -28,7 +28,7 @@
 | raw_protocol_multiseed.json | 表 4 首行口径，原始协议漂移（5 种子 42-46） |
 | t3_soh_tcn_s42-46.json | 表 4 逐种子原始输出（原始协议，t3_transfer_local.py 产物） |
 | t3b_tcn/lstm_s42-46.json | 表 3 逐种子原始输出（逐数据集标准化协议，t3b_std_local.py 产物） |
-| t3b_tcn_s42_repeat1/2.json | 4.8 节同种子两次独立执行的重复对（CALCE 零样本 RMSE 相差 14%，GPU 非确定性实证） |
+| t3b_tcn_s42_repeat1/2.json | 4.9 节同种子两次独立执行的重复对（CALCE 零样本 RMSE 相差 14%，GPU 非确定性实证） |
 | t3_rul_tcn_s42.json | RUL 口径对照（3.1 节末尾提到 SOH 作迁移评估目标的依据） |
 
 > 口径提示：表 3（论文主表）= 逐数据集标准化协议 = t3b 文件；表 4 首行 = 原始协议
@@ -50,7 +50,7 @@
 | t4c_multiseed_summary.json | 4.5 节条件化收窄（Mondrian / 加权，负结果） |
 | t4_tcn/lstm_s42-46.json | 表 5 的逐种子原始输出（含逐电芯残差向量） |
 | t4c_mondrian_s42-46.json / t4c_weighted_s42-46.json | 4.5 节扩展实验的逐种子输出 |
-| t4d_per_cell_tcn/lstm_s42-46.json | 4.5 节末补充诊断（逐电芯覆盖率、逐循环残差、聚合保形变体） |
+| t4d_per_cell_tcn/lstm_s42-46.json | 4.6 节补充诊断（逐电芯覆盖率、逐循环残差、聚合保形变体） |
 
 > 版本说明（2026-10）：t4 与 t4d 的旧版实现误用"微调前模型"的残差计算目标域校准
 > 分位数、却在微调后模型上评估覆盖，违反拆分保形的同源前提，旧结果（目标校准
@@ -69,7 +69,7 @@
 
 ## 其他
 
-- `early_pred_summary.json` / `early_pred_results.csv`：4.7 节早期寿命预测（ΔQ 特征 + 岭回归，逐电芯预测明细 119 颗；log10 RMSE 0.117 / 循环 RMSE 141.7 / MAPE 19.5%；脚本 `code/early_pred/t5_early_pred.py`）
+- `early_pred_summary.json` / `early_pred_results.csv`：4.8 节早期寿命预测（ΔQ 特征 + 岭回归，逐电芯预测明细 119 颗；log10 RMSE 0.117 / 循环 RMSE 141.7 / MAPE 19.5%；脚本 `code/early_pred/t5_early_pred.py`）
 
 ## 口径提示
 
@@ -78,8 +78,9 @@
 - 表 3 的增益比是逐种子（基线/微调）再平均，不是两列均值相除；重尾分布下中位数口径更保守（4.3 有并列披露）
 - 表 5 的划分硬编码（CALCE 3/2/3，NASA 2/1/1）；Mondrian / 加权用 1/3 三分协议；
   每种子的划分随种子重新抽取，± 同时反映训练随机性与划分差异
-- 同种子重跑会有小幅浮动（GPU 非确定性），零点几到几个百分点的差异属正常范围；
-  两套脚本管线的源域预训练不可逐位复现（同种子微调 RMSE 相差最高 57%，见论文 4.8）
+- 同种子重跑会有小幅浮动（GPU 非确定性），零点几到几个百分点的差异属正常范围（论文 4.9）。
+  **早期版本**两套管线的源域预训练不可逐位复现（同种子微调 RMSE 相差最高 57%）；
+  **投稿版（results_cx2/）已统一源模型缓存**，该差异不复存在。
 
 ## CX2 扩充版（results_cx2/，2026-10 投稿版）
 
@@ -88,6 +89,6 @@ CALCE 目标域 8→16 颗后全部实验重跑的结果，目录结构与本目
 - ablation/ 表 6（base7/curve14 配对 t）
 - conformal/ 表 5（划分 CALCE 7/2/7）+ t4c（5/5/6）+ t4d 逐电芯诊断
   + t4_split_sweep/（校准电芯 1-5 档扫描）+ i9_seeds/（50 次划分重抽）
-- 复算：python code/checks/verify_results.py --results results_cx2（118 项全绿）
+- 复算：python code/checks/verify_results.py --results results_cx2（126 项全绿）
 本目录（results/）为 8 电芯协议的历史版本，冻结保留，仍可用
 python code/checks/verify_results.py 核对 179/179。
