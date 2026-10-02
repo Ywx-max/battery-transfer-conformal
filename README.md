@@ -81,8 +81,10 @@ figures_reproduce/   论文 5 张图的复现脚本
 获取方式与目录结构见 `DATA.md`。
 
 论文自己的实验结果放在 `results_cx2/`（**投稿版**，CALCE 16 颗），`results/` 为 8 电芯历史口径冻结版；两者都是各实验脚本的原始输出，哪个文件对应论文哪张表
-在 `results/README.md` 里列了。`figures_reproduce/make_figures.py` 直接从 `results/`
-读数据重画论文全部 5 张图。
+在 `results/README.md` 里列了。`figures_reproduce/make_figures.py` 重画论文全部 5 张图：
+图 2–5 读 `results_cx2/`（投稿版 16 电芯口径），图 1（LOBO 逐电芯 RMSE 分布）
+读 `results/baselines/`（`results_cx2/` 无 baselines 目录）。输出为 75 mm 宽、
+Arial 六号字的 600 dpi PNG 与矢量 PDF，与论文 `figures/` 逐图一致。
 
 ## 运行环境
 
