@@ -13,8 +13,15 @@ code/checks/aggregate_results.py 从逐种子原始文件再生（三层对齐�
 口径（2026-10 修订）：全部 ± 为样本标准差（ddof=1）；表 5 为校准/评估同源
 修复后的重跑结果；表 6 显著性为配对 t 检验（df=4）。
 """
-import csv, json, math, statistics as st
+import argparse, csv, json, math, statistics as st, sys, subprocess
 from pathlib import Path
+
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--results", default="results",
+                 help="结果根目录（默认 results；CX2 扩充版传 results_cx2，将由 verify_results_cx2.py 核对）")
+_args, _ = _ap.parse_known_args()
+if _args.results != "results":
+    sys.exit(subprocess.call([sys.executable, str(Path(__file__).with_name("verify_results_cx2.py"))]))
 
 ROOT = Path(__file__).resolve().parents[2]
 RES = ROOT / "results"

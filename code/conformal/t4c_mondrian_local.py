@@ -90,7 +90,7 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--seed', type=int, default=42)
     ap.add_argument('--data', default=DATA)
-    ap.add_argument('--out', default=OUT)
+    ap.add_argument('--out', default="results/conformal")
     ap.add_argument('--src-cache', default=None)
     args=ap.parse_args()
     SEED=args.seed

@@ -268,6 +268,8 @@ def agg_i9():
             pw.append(t["target_calibrated"]["MPIW"])
             rm.append(t["point_rmse"])
         v = np.asarray(pt)
+        if len(v) == 0:
+            continue  # 该骨干的 i9 尚未跑完（tcn 先行，lstm 随后）
         q = lambda p: float(np.quantile(v, p))
         out[model] = {"n": len(v),
                       "picp_tgt": {"mean": float(v.mean()), "std": float(v.std(ddof=1)),
@@ -286,12 +288,14 @@ if __name__ == "__main__":
     R = args.results
     agg_t3b()
     agg_t3soh()
-    agg_t3x("ablation", "t3c", "ablation_multiseed.json", ["base7"])
-    agg_t3x("ablation", "t3d", "ablation_multiseed_v5.json", ["base7", "curve14"])
+    if R == "results":
+        # 源域产物与 v3/v5 时代消融仅属旧结果（cx2 未重跑，冻结不动）
+        agg_t3x("ablation", "t3c", "ablation_multiseed.json", ["base7"])
+        agg_t3x("ablation", "t3d", "ablation_multiseed_v5.json", ["base7", "curve14"])
+        agg_f5()
+        agg_lobo()
+        agg_lobo_csv()
     agg_t3x("ablation", "t3e", "ablation_v3c_multiseed.json", ["base7", "curve14"])
-    agg_f5()
-    agg_lobo()
-    agg_lobo_csv()
     agg_conformal()
     agg_t4c()
     if R != "results":

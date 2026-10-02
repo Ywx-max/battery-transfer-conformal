@@ -116,7 +116,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
-    ap.add_argument("--out", default=OUT, help="结果输出目录")
+    ap.add_argument("--out", default="results/conformal", help="结果输出目录")
     ap.add_argument("--src-cache", default=None,
                     help="统一源模型缓存目录；命中则跳过源域预训练")
     args = ap.parse_args()

@@ -192,9 +192,9 @@ def main():
     ap.add_argument("--ft-epochs", type=int, default=60)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
-    ap.add_argument("--out", default=OUT, help="结果输出目录")
+    ap.add_argument("--out", default="results/conformal", help="结果输出目录")
     ap.add_argument("--src-cache", default=None, help="统一源模型缓存目录（缺省 <out>/src_cache）")
-    ap.add_argument("--ref-dir", default=REF, help="t4_*.json 参照目录（划分 assert 用）")
+    ap.add_argument("--ref-dir", default="results/conformal", help="t4_*.json 参照目录（划分 assert 用）")
     args = ap.parse_args()
     CACHE = os.path.join(args.out, "src_cache") if args.src_cache is None else args.src_cache
     OUT = args.out
@@ -227,7 +227,15 @@ def main():
 
     results = {"model": args.model, "alpha": ALPHA, "seed": args.seed, "q_src": q_src,
                "targets": {}}
-    for tgt_name, split in [("CALCE", (3, 2, 3)), ("NASA", (2, 1, 1))]:
+    # 划分与 t4 严格一致：直接从参照 t4_*.json 读取各目标域的 ft/cal/te 数
+    _ref_splits = {}
+    for tgt_name in ("CALCE", "NASA"):
+        _rp = os.path.join(REF, "t4_%s_s%d.json" % (args.model, args.seed))
+        if os.path.exists(_rp):
+            _sp = json.load(open(_rp, encoding="utf-8"))["targets"][tgt_name]["split"]
+            _ref_splits[tgt_name] = (len(_sp["ft"]), len(_sp["cal"]), len(_sp["te"]))
+    for tgt_name, split in [("CALCE", _ref_splits.get("CALCE", (3, 2, 3))),
+                            ("NASA", _ref_splits.get("NASA", (2, 1, 1)))]:
         tgt = build_windows_ds(df, tgt_name)
         tb = sorted(tgt)
         n_ft, n_cal, n_te = split
