@@ -79,11 +79,14 @@ LaTeX 源），克隆仓库跑不了它，但结果文件本身可以直接看�
 ## 复现边界
 
 - 逐种子结果 → 汇总 → 论文数字这一链路可完全复算（verify + aggregate 两个脚本）。
-- 从原始数据端到端重训受三处限制：① MIT 侧建模表中间产物（mit_capacity.csv 等
+- 从原始数据端到端重训受四处限制：① MIT 侧建模表中间产物（mit_capacity.csv 等
   8 个输入）未随仓库发布，`build_modeling_table.py` 不能从零重跑（论文用的 v3/v3c/v5
   表已随仓库冻结提供）；② 训练有 GPU 非确定性，重跑数字会有小幅浮动；③
   `data/mit_dq_early.csv` 为冻结版本，`extract_mit_dq_early.py` 是特征定义的独立
-  实现（方差/均值已对齐，斜率/极值存在实现差异，见其 docstring）。
+  实现（方差/均值已对齐，斜率/极值存在实现差异，见其 docstring）；④ 源模型缓存
+  （`results_cx2/src_cache/*.pt`，约 52 MB）未随仓库分发（`.gitignore` 排除 `*.pt`）：
+  全部训练脚本支持 `--src-cache`，首次运行自动重建并落盘；不提供缓存时源域预训练
+  为现场重训，且各脚本不再共享同一批权重。
 
 ## 常见改造点
 

@@ -75,7 +75,7 @@ save(fig, "lobo_distribution")
 d = json.load(open(os.path.join(RESULTS, "transfer", "transfer_multiseed_v2.json"), encoding="utf-8"))
 groups = ["CALCE_tcn", "CALCE_lstm", "NASA_tcn", "NASA_lstm"]
 glabels = ["CALCE/TCN", "CALCE/LSTM", "NASA/TCN", "NASA/LSTM"]
-series = [("zero", "Zero-shot", "#c0504d"), ("ft", "Fine-tune", "#70ad47"), ("to", "Target-only", "#7f7f7f")]
+series = [("zero", "Zero-shot", "#3d7ab5"), ("ft", "Fine-tune", "#e8a33d"), ("to", "Target-only", "#7f7f7f")]
 import numpy as np
 
 T3B = os.path.join(RESULTS, "transfer")
@@ -88,14 +88,14 @@ def per_seed(dom, model, key):
     return out
 
 def log_yerr(vals, mean_ref):
-    """对数尺度的 ±1 标准差：柱高保持算术均值（与表内数字一致），
-    上下须按 log10 空间的 std 对称展开——原始尺度对称 std 在 log 轴上
-    会把下须拉到轴底（如 CALCE/LSTM 微调 mean-std≈0.0005）。"""
+    """对数尺度的 +1 标准差（仅向上）：柱高保持算术均值（与表内数字一致），
+    按 log10 空间的 std 向上展开。对称展开会让下须低于轴下限而被裁掉
+    （2026-10 P2-2 修订），故下须恒为 0。"""
     lg = [np.log10(v) for v in vals]
     s = float(np.std(lg, ddof=1))
     lm = np.log10(mean_ref)
-    lo = 10 ** (lm - s); hi = 10 ** (lm + s)
-    return mean_ref, mean_ref - lo, hi - mean_ref
+    hi = 10 ** (lm + s)
+    return mean_ref, 0.0, hi - mean_ref
 
 x = np.arange(len(groups)); w = 0.26
 fig, ax = plt.subplots(figsize=(W, 2.1))
@@ -126,12 +126,12 @@ for ax, domain in zip(axes, ["CALCE", "NASA"]):
     src_s = [d[f"{domain}_{b}"]["picp_src"]["std"] for b in backs]
     tgt_m = [d[f"{domain}_{b}"]["picp_tgt"]["mean"] for b in backs]
     tgt_s = [d[f"{domain}_{b}"]["picp_tgt"]["std"] for b in backs]
-    ax.bar(x - w/2, src_m, w, yerr=src_s, capsize=1.5, color="#c0504d",
+    ax.bar(x - w/2, src_m, w, yerr=src_s, capsize=1.5, color="#3d7ab5",
            label="Source-calibrated", error_kw=dict(linewidth=0.6))
-    ax.bar(x + w/2, tgt_m, w, yerr=tgt_s, capsize=1.5, color="#70ad47",
+    ax.bar(x + w/2, tgt_m, w, yerr=tgt_s, capsize=1.5, color="#e8a33d",
            label="Target-calibrated", error_kw=dict(linewidth=0.6))
     ax.axhline(0.90, color="black", linestyle="--", linewidth=0.7)
-    ax.text(1.35, 0.87, "Nominal 0.90", fontsize=6, ha="right", va="top")
+    ax.text(0.04, 0.97, "Nominal 0.90", transform=ax.transAxes, fontsize=6, ha="left", va="top")
     ax.set_xticks(x); ax.set_xticklabels(["TCN", "LSTM"])
     ax.set_ylim(0, 1.12)
     ax.set_title(f"Target: {domain}", fontsize=7)

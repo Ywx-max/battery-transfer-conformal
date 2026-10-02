@@ -64,10 +64,11 @@ figures_reproduce/   论文 5 张图的复现脚本
   `results/` 下的逐种子原始文件再生（论文数字 → 汇总文件 → 逐种子文件，三层对齐），
   约 1 秒、纯 numpy。（`final_data_check.py` 是同一核对的作者本地版，依赖作者机器的
   目录布局，仅供参照。）
-- 完整的端到端复现（从原始数据重训全部实验）受三处限制，见 `code/README.md` 的
+- 完整的端到端复现（从原始数据重训全部实验）受四处限制，见 `code/README.md` 的
   「复现边界」：MIT 侧建模表中间产物未随仓库发布、训练结果有 GPU 非确定性、
   `data/mit_dq_early.csv` 为冻结版本（提取实现见 `code/data_prep/extract_mit_dq_early.py`
-  的说明）。
+  的说明）、源模型缓存（`src_cache/*.pt`，约 52 MB）未随仓库分发——训练脚本以
+  `--src-cache` 指向缓存目录时首次运行会自动重建并落盘。
 
 ## 数据来源（均为公开数据集，本仓库不转存原始数据）
 

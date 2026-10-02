@@ -8,6 +8,7 @@ data/*
 !data/mit_dq_early.csv
 *.xlsx
 *.pt
+# ↑ 源模型缓存（*.pt，约 52 MB）不随仓库分发：训练脚本首次运行会自动重建
 *.pth
 
 
