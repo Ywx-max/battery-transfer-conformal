@@ -91,3 +91,21 @@ LaTeX 源），克隆仓库跑不了它，但结果文件本身可以直接看�
 - 调保形失配率：`ALPHA`（0.10 → 0.90 名义覆盖），各脚本顶部。
 - 加诊断指标：`t4_conformal_local.py` / `t4d_per_cell_diag.py` 的 json 里存了逐电芯
   残差向量，改评估逻辑不用重训。
+
+## CX2 扩充（2026-10，投稿版）
+
+- 目标域 CALCE 8→16 颗（CS2 8 + CX2 8）；纳入准则与排除电芯见论文 4.1 节；
+  解析器 RATED 按电芯系列（CS2 1.1 / CX2 1.35 Ah），CX2_31 走 CADEX txt 分支。
+  原始 zip 置于 data/raw/calce/（不随仓库分发）。
+- 新脚本：
+  data_prep/build_calce_curve_features.py  曲线特征（v_q/ICA 形状）驱动
+  data_prep/build_modeling_table_cx2.py    v3_cx2 / v3c_cx2 追加（含 V1-V3 自验证与 assert）
+- 新数据：data/建模表_v3_cx2.csv.gz、建模表_v3c_cx2.csv.gz、calce_full_v2_cx2.csv
+- **统一源模型缓存**：全部训练脚本支持 --src-cache（键含 epochs；旧 t4d_src_* 命名作回退），
+  t3b/t3e/t4/t4d/t4c 共用同一批 MIT 预训练权重——此前"两套管线相差最高 57%"的问题随之消除。
+- 新结果目录：results_cx2/（结构与 results/ 镜像；含 t4_split_sweep 校准电芯数扫描、
+  i9_seeds 50 次划分重抽）。旧 results/ 为 8 电芯协议历史版本，冻结保留。
+- 复算：python code/checks/verify_results.py --results results_cx2（118 项）；
+  不带参数仍对旧口径核对 179/179。
+- 表 5 划分（CX2 版）：CALCE 7/2/7、NASA 2/1/1（--split-calce/--split-nasa 可改）；
+  t4c 协议（CX2 版）：CALCE 5/5/6、NASA 1/1/2。

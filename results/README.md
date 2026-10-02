@@ -80,3 +80,14 @@
   每种子的划分随种子重新抽取，± 同时反映训练随机性与划分差异
 - 同种子重跑会有小幅浮动（GPU 非确定性），零点几到几个百分点的差异属正常范围；
   两套脚本管线的源域预训练不可逐位复现（同种子微调 RMSE 相差最高 57%，见论文 4.8）
+
+## CX2 扩充版（results_cx2/，2026-10 投稿版）
+
+CALCE 目标域 8→16 颗后全部实验重跑的结果，目录结构与本目录镜像：
+- transfer/ 表 3（5 种子）；t3_soh_* 表 4 首行（原始协议）
+- ablation/ 表 6（base7/curve14 配对 t）
+- conformal/ 表 5（划分 CALCE 7/2/7）+ t4c（5/5/6）+ t4d 逐电芯诊断
+  + t4_split_sweep/（校准电芯 1-5 档扫描）+ i9_seeds/（50 次划分重抽）
+- 复算：python code/checks/verify_results.py --results results_cx2（118 项全绿）
+本目录（results/）为 8 电芯协议的历史版本，冻结保留，仍可用
+python code/checks/verify_results.py 核对 179/179。

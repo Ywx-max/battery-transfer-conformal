@@ -24,6 +24,8 @@
 | `data/建模表_v3c.csv.gz` | 建模表 v3c = v3 + 7 列放电曲线特征（20 列）；消融实验的输入 |
 | `data/建模表_v5.csv.gz` | 建模表 v5（数据版本对照，`t3d_ablation_v5.py` 的输入） |
 | `data/mit_dq_early.csv` | MIT 早期预测的 ΔQ 特征表（124 行，含寿命标签）；4.7 节脚本的输入 |
+| `data/建模表_v3_cx2.csv.gz` | CX2 扩充版建模表（CALCE 16 颗；论文投稿版实验的输入） |
+| `data/建模表_v3c_cx2.csv.gz` | CX2 扩充版 + 7 列曲线特征 |
 
 解压：`gunzip data/建模表_v3.csv.gz`（Windows 下用 7-Zip 或 `gzip -d` 同样可以）。
 这三张建模表由 `code/data_prep/` 的解析脚本产出的分数据集特征表合并而成，
