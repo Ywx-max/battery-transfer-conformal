@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""重建 calce_curve_features.csv（I1 补链路）：build_modeling_table.py 的曲线特征输入。
+"""重建 calce_curve_features.csv：build_modeling_table.py 的曲线特征输入。
 
 背景：论文表 6 的 curve14 消融依赖 calce_curve_features.csv，但产出它的驱动脚本
 此前不在仓库（只有 03_实验 留档的参考产物）。本脚本基于 parse_calce_v2 的既有

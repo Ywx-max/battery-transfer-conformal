@@ -8,7 +8,7 @@
    "曲线增强 14 维"里那几个 curve 特征就是从这里来的
 3. 特征与容量分开算再按放电循环顺序对齐（两者循环数偶尔不一致时取交集并告警）
 
-本版是 CALCE 的最终解析版（产出 calce_full_v2.csv）；v1 保留作中间产物出处。
+本脚本产出 calce_full_v2.csv；v1 保留作中间产物出处。
 xlsx 引擎用的 calamine（pip install python-calamine）：官方 openpyxl 对这批
 文件又慢又偶尔报错，calamine 快一个数量级还更稳。"""
 import io, time, zipfile

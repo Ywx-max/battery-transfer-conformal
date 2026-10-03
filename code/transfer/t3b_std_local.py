@@ -148,7 +148,7 @@ def main():
                          "与论文发布结果的生产环境一致）")
     ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
     ap.add_argument("--src-cache", default=None,
-                    help="统一源模型缓存目录（I6）：命中则跳过源域预训练，未命中则训练后写入")
+                    help="统一源模型缓存目录：命中则跳过源域预训练，未命中则训练后写入")
     args = ap.parse_args()
     if args.deterministic:
         # CUBLAS_WORKSPACE_CONFIG 必须在首个 CUDA 操作前设置

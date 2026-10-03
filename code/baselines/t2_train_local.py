@@ -184,8 +184,7 @@ def main():
     for k, (tri, tei) in enumerate(gkf.split(X_all, y_all, g_all)):
         # scaler 只用训练折拟合：拿全量拟合会把测试折的均值方差泄漏进来
         sc = StandardScaler().fit(X_all[tri].reshape(-1, X_all.shape[2]))
-        # 训练/验证/测试三处一律用同一套统计量标准化。
-        # 早期版本漏了训练集：训练在原始量纲、评测在标准化量纲，指标被整体抬高（2026-10 修订）
+        # 训练/验证/测试三处一律用同一套统计量标准化（scaler 只用训练集拟合）。
         Xtr = (X_all[tri] - sc.mean_) / (sc.scale_ + 1e-8)
         Xte = (X_all[tei] - sc.mean_) / (sc.scale_ + 1e-8)
         # 从训练折尾部切 12% 做早停验证（仍按窗口切：只用来决定何时停，不报指标）

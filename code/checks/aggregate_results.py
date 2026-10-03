@@ -20,10 +20,8 @@ Transformer / 集成的"各 2 次重复"聚合）。本脚本补齐聚合层，�
 
 口径说明：
   * 全部 std 为样本标准差（ddof=1），与论文表题一致。
-    （旧版 baseline_3seed_final.json 的 rmse_std 误用总体标准差 ddof=0，已订正。）
-  * lobo_final_multiseed.json 中 lstm / transformer / ensemble 的"各 2 次重复"
-    聚合无逐折原始文件支撑，已从汇总中撤下，只保留有 jsonl 支撑的原运行与
-    TCN 的 3 次重复（对应论文正文相应复现表述的修订）。
+  * lobo_final_multiseed.json 只保留有逐折 jsonl 支撑的运行（TCN 的 3 次重复）；
+    lstm / transformer / ensemble 的两次重复因缺少逐折原始文件，不纳入汇总。
   * t4c_mondrian_*.json 为 2026-10 之前的原始运行（该脚本无缺陷，未重跑）；
     t4c_weighted_*.json 为修复测试标签泄漏与加权分位数 off-by-one 后的重跑结果。
 
@@ -112,7 +110,7 @@ def agg_f5():
         for s in range(42, 45):
             d = load(f"{R}/baselines/{model}_f5_s{s}.json")
             folds = d["folds"]
-            # 每种子的 RMSE = 5 折 RMSE 的算术平均（与旧版汇总及论文表 1 口径一致）
+            # 每种子的 RMSE = 5 折 RMSE 的算术平均（与论文表 1 口径一致）
             seed_rmse.append(np.mean([f["rmse"] for f in folds]))
             seed_mae.append(np.mean([f["mae"] for f in folds]))
         seed_rmse, seed_mae = np.asarray(seed_rmse), np.asarray(seed_mae)
@@ -226,7 +224,7 @@ def agg_t4c():
 
 
 def agg_sweep():
-    """I7 覆盖率-校准电芯数扫描汇总（cx2）。"""
+    """覆盖率-校准电芯数扫描汇总（cx2）。"""
     out = {}
     for model in ("tcn", "lstm"):
         for nc in (1, 2, 3, 4, 5):
@@ -254,7 +252,7 @@ def agg_sweep():
 
 
 def agg_i9():
-    """I9 统计效力：50 次划分重抽的抽样分布（cx2）。"""
+    """划分重抽（50 次）的抽样分布（cx2）。"""
     out = {}
     for model in ("tcn", "lstm"):
         pt, pw, rm = [], [], []

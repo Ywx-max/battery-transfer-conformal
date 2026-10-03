@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""I5：建模表 CX2 追加（生成 建模表_v3_cx2 / v3c_cx2，冻结表一字不动）。
+"""建模表 CX2 追加（生成 建模表_v3_cx2 / v3c_cx2，冻结表一字不动）。
 
 组成规则：
   v3_cx2  = 冻结 建模表_v3 的全部行（MIT/NASA/CS2 逐行原样） + CX2 8 颗的新行
@@ -11,15 +11,15 @@ CX2 行来源：
   曲线特征 = parse_calce_v2 的"容量+特征对齐流"（xlsx 电芯：v_q10 非空特征流与
              电流积分容量流按放电循环先后位置对齐，同 parse_calce_v2.main；
              txt 电芯：process_txt_cell 单遍输出）。
-  ★ 管线考古结论（2026-10-02）：冻结 v3c 的 CALCE 曲线列与 calce_full_v2.csv 按
-    cycle 键连接**逐值一致**（8 电芯 0 不一致，本脚本 assert 复验），而非仓库
-    build_modeling_table.py 重建版所读的 calce_curve_features.csv（该 CSV 的
-    循环编号属于更早的管线时代，与 v1 键仅 ~39% 相交）。因此本脚本沿用真实机制。
+  说明：冻结 v3c 的 CALCE 曲线列与 calce_full_v2.csv 按 cycle 键连接逐值一致
+    （8 电芯 0 处不一致，本脚本 assert 复验），而非仓库 build_modeling_table.py
+    重建版所读的 calce_curve_features.csv（该 CSV 的循环编号与 v1 键仅约 39% 相交）。
+    因此本脚本沿用前者。
 
 自验证（脚本内 assert）：
   V1  非_CALCE 行与冻结 v3 逐行相同；CALCE 行数 = 旧 CALCE + CX2；CX2 三缺失列 100% 空；
   V2  用现行代码重建的 full_v2（CS2 部分）按 cycle 连接，与冻结 v3c 的 CALCE 曲线列
-      逐值一致（等价于 I1/I4.1 的 1e-14 回归 + 装配机制验证）。
+      逐值一致（与上游产物做 1e-14 回归校验）。
 
 运行：python code/data_prep/build_modeling_table_cx2.py
 输出：data/建模表_v3_cx2.csv.gz、data/建模表_v3c_cx2.csv.gz、data/calce_full_v2_cx2.csv

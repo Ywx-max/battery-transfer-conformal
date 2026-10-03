@@ -20,7 +20,7 @@ v3c = v3 + 7 列放电曲线特征（v_q10…v_q90、ICA 次峰 ica2_peak、半�
 
     python build_modeling_table.py
 
-数据版本说明：建模表 v3 与后来的 v5 之间有过一次解析口径修订（详见 results/README.md），
+数据版本说明：v3 与 v5 两版建模表在解析口径上存在差异（详见 results/README.md），
 因此本脚本按论文所述规则重建的结果，与论文实验所用的那一版表在个别电芯的离群点/EOL 标注上
 可能有一行级差别。论文实验实际使用的两张表随仓库提供（data/建模表_v3.csv.gz、
 data/建模表_v3c.csv.gz），解压后可直接替代本脚本的输出。

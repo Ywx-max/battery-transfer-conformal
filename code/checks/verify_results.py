@@ -10,8 +10,8 @@
 说明：本脚本核对的是"论文数字 vs 仓库汇总文件"的一致性；汇总文件本身可由
 code/checks/aggregate_results.py 从逐种子原始文件再生（三层对齐：
 论文 -> 汇总 -> 逐种子）。它不能发现实验方法层面的设计问题。
-口径（2026-10 修订）：全部 ± 为样本标准差（ddof=1）；表 5 为校准/评估同源
-修复后的重跑结果；表 6 显著性为配对 t 检验（df=4）。
+口径：全部 ± 为样本标准差（ddof=1）；表 5 的分位数与覆盖评估同源；
+表 6 显著性为配对 t 检验（df=4）。
 """
 import argparse, csv, json, math, statistics as st, sys, subprocess
 from pathlib import Path

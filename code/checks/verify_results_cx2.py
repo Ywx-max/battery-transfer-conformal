@@ -3,7 +3,7 @@
 
     python code/checks/verify_results_cx2.py
 
-口径与 verify_results.py 相同（纯标准库），期望值为 2026-10-03 CX2 扩充版论文所报数值。
+口径与 verify_results.py 相同（纯标准库），期望值为投稿版（CX2 扩充）论文所报数值。
 旧口径（results/）仍可用 verify_results.py 核对，保持 179/179。
 """
 import csv, json, math, os, statistics as st
@@ -214,26 +214,26 @@ for mod, agg_m, agg_sd, min_tgt in [("tcn", 0.61, 0.28, 0.40), ("lstm", 0.59, 0.
     check("4.6 %s 聚合保形覆盖标准差" % mod, agg_sd, s_agg, 0.005)
     check("4.6 %s 逐电芯目标覆盖最低" % mod, min_tgt, min(pc), 0.005)
 
-# ---------- I7 扫描（cal1-5 均值） ----------
+# ---------- 校准电芯数扫描（cal1-5 均值） ----------
 sw = load("conformal/t4_split_sweep/sweep_summary.json")
 SWEXP = {"tcn": [0.883, 0.874, 0.910, 0.898, 0.900],
          "lstm": [0.844, 0.875, 0.815, 0.854, 0.833]}
 for m in ("tcn", "lstm"):
     for i, nc in enumerate((1, 2, 3, 4, 5)):
-        check("I7 %s 校准%d颗覆盖均值" % (m, nc), SWEXP[m][i], sw[m]["cal%d" % nc]["picp_tgt"]["mean"], 5e-4)
+        check("校准电芯扫描 %s %d 颗覆盖率均值" % (m, nc), SWEXP[m][i], sw[m]["cal%d" % nc]["picp_tgt"]["mean"], 5e-4)
 
-# ---------- I9 抽样分布（完成时追加核对；未完成则仅报告） ----------
-i9p = RES / "conformal/i9_seeds/i9_summary.json"
-if i9p.exists():
-    i9 = json.load(open(i9p, encoding="utf-8"))
-    I9EXP = {"tcn": (50, 0.854, 0.121, 20), "lstm": (50, 0.856, 0.110, 21)}
-    for m, v in i9.items():
-        e = I9EXP[m]
-        check("I9 %s 重抽次数" % m, e[0], v["n"], 0)
-        check("I9 %s 覆盖抽样均值" % m, e[1], v["picp_tgt"]["mean"], 5e-4)
-        check("I9 %s 覆盖抽样标准差" % m, e[2], v["picp_tgt"]["std"], 5e-4)
-        check("I9 %s 达标(>=0.90)次数" % m, e[3], round(v["frac_ge_090"] * v["n"]), 0)
-        print("[I9] %s n=%d 覆盖均值 %.4f std %.4f q05 %.4f q95 %.4f 达标比例 %.3f"
+# ---------- 划分重抽抽样分布 ----------
+rndp = RES / "conformal/i9_seeds/i9_summary.json"
+if rndp.exists():
+    rnd = json.load(open(rndp, encoding="utf-8"))
+    RNDEXP = {"tcn": (50, 0.854, 0.121, 20), "lstm": (50, 0.856, 0.110, 21)}
+    for m, v in rnd.items():
+        e = RNDEXP[m]
+        check("划分重抽 %s 次数" % m, e[0], v["n"], 0)
+        check("划分重抽 %s 覆盖均值" % m, e[1], v["picp_tgt"]["mean"], 5e-4)
+        check("划分重抽 %s 覆盖标准差" % m, e[2], v["picp_tgt"]["std"], 5e-4)
+        check("划分重抽 %s 达标(>=0.90)次数" % m, e[3], round(v["frac_ge_090"] * v["n"]), 0)
+        print("[划分重抽] %s n=%d 覆盖均值 %.4f std %.4f q05 %.4f q95 %.4f 达标比例 %.3f"
               % (m, v["n"], v["picp_tgt"]["mean"], v["picp_tgt"]["std"],
                  v["picp_tgt"]["q05"], v["picp_tgt"]["q95"], v["frac_ge_090"]))
 

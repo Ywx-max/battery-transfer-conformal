@@ -143,7 +143,7 @@ def main():
                          "与论文发布结果的生产环境一致）")
     ap.add_argument("--data", default=DATA, help="建模表 csv 路径")
     ap.add_argument("--src-cache", default=None,
-                    help="统一源模型缓存目录（I6）：命中则跳过源域预训练，未命中则训练后写入")
+                    help="统一源模型缓存目录：命中则跳过源域预训练，未命中则训练后写入")
     args = ap.parse_args()
     # 特征集在运行时切换：base7 = 论文的"基础 7 维"，curve14 = "曲线增强 14 维"
     global FEATS
